@@ -73,7 +73,7 @@
         const BLOCK_SIZE = BLOCK_BITMAP_SIZE + BLOCK_EXTRA_DATA
         const BITMAP_WIDTH = 64
 
-        const ZOOM_LEVEL = 4
+        const ZOOM_LEVEL = 8
 
         class Block {
             constructor(x, y, data) {
@@ -125,7 +125,7 @@
                         let block_y = Math.round(i / TILE_WIDTH)
                         let start_offset = TILE_HEADER_SIZE + (block_idx - 1) * BLOCK_SIZE
                         let end_offset = start_offset + BLOCK_SIZE
-                        var block_data = data.slice(start_offset, end_offset)
+                        var block_data = this.data.slice(start_offset, end_offset);
                         this.blocks[[block_x, block_y]] = new Block(block_x, block_y, block_data)
                     }
                 }
@@ -154,7 +154,7 @@
                 tileCanvas.id = tile.id.toString();
 
                 var size = Math.round(TILE_WIDTH * BITMAP_WIDTH / ZOOM_LEVEL)
-                size = 32;
+                size = size + 1; // FIXME
                 tileCanvas.width = size;
                 tileCanvas.height = size;
 
@@ -170,9 +170,8 @@
                             x = Math.round(x / ZOOM_LEVEL);
                             y = Math.round(y / ZOOM_LEVEL);
                             if (block.is_visited(j, k)) {
-                                // tileCanvas.
-                                // ctx.fillStyle = "#FF0000";
-                                // ctx.fillRect(x, y, 16, 16);
+                                ctx.fillStyle = "#000000";
+                                ctx.fillRect(x, size-y, 1, 1);
                                 // im.putpixel((x, y), ImageColor.getcolor('black', 'RGB'))
                             }
 
@@ -180,7 +179,7 @@
                     }
                 }
 
-                ctx.fillRect(30, 30, 30, 30);
+                // ctx.fillRect(30, 30, 100, 100);
 
                 // document.body.appendChild(tileCanvas);
                 // debugger;
