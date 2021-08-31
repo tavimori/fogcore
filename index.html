@@ -270,7 +270,7 @@
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(Math.floor(45 - 3 * mapRoom), 1);
+                var fogRoom = Math.max(2**Math.floor(13 - mapRoom), 1);
                 activeTiles.forEach(tile => tile.setZoom(fogRoom));
                 // console.log(`zoom: ${zoom}`);
                 // if (zoom < 8) {
