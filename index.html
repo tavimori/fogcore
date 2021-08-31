@@ -98,6 +98,12 @@
             return [lng, lat];
         }
 
+        function tile_lng_lat_to_x_y(lng, lat) {
+            x = (lng + 180) / 360 * 512
+            y = (Math.PI - Math.asinh(Math.tan(lat / 180 * Math.PI)))  * 512 / (2 * Math.PI)
+            return [x, y]
+        }
+
         class Tile {
             constructor(filename, data) {
 
@@ -123,6 +129,37 @@
                         let end_offset = start_offset + BLOCK_SIZE
                         var block_data = this.data.slice(start_offset, end_offset);
                         this.blocks[[block_x, block_y]] = new Block(block_x, block_y, block_data)
+                    }
+                }
+
+                this.canvas = document.createElement("canvas");
+                this.canvas.id = this.id.toString();
+                this.renderCanvas();
+            }
+
+            renderCanvas() {
+                var size = Math.floor(TILE_WIDTH * BITMAP_WIDTH / ZOOM_LEVEL)
+                size = size + 1; // FIXME
+                this.canvas.width = size;
+                this.canvas.height = size;
+
+                var ctx = this.canvas.getContext("2d");
+
+                var blocks = Object.values(this.blocks);
+                for (var i = 0; i < blocks.length; i++) {
+                    var block = blocks[i];
+                    for (var j = 0; j < BITMAP_WIDTH; j++) {
+                        for (var k = 0; k < BITMAP_WIDTH; k++) {
+                            var x = block.x * BITMAP_WIDTH + j;
+                            var y = block.y * BITMAP_WIDTH + k;
+                            x = Math.floor(x / ZOOM_LEVEL);
+                            y = Math.floor(y / ZOOM_LEVEL);
+                            if (block.is_visited(j, k)) {
+                                ctx.fillStyle = "#000000";
+                                ctx.fillRect(x, y, 1, 1);
+                            }
+
+                        }
                     }
                 }
             }
@@ -167,7 +204,24 @@
 
             optimizeView() {
                 console.log("optimizing view...");
-                console.log(this.map.getBounds())
+                var bounds = this.map.getBounds();
+                var sw = tile_lng_lat_to_x_y(bounds._sw.lng, bounds._sw.lat);
+                var ne = tile_lng_lat_to_x_y(bounds._ne.lng, bounds._ne.lat);
+
+                // FIXME: check if the region across lng=0
+                var xMin = Math.floor(sw[0]);
+                var xMax = Math.ceil(ne[0]);
+
+                var yMin = Math.floor(ne[1]);
+                var yMax = Math.floor(sw[1]);
+
+                var activeTiles = Object.keys(this.tiles).filter(keyString => {
+                    let key = keyString.split(",").map(x => parseInt(x));
+                    return (key[0] >= xMin) && (key[0] <= xMax) && (key[1] >= yMin) && (key[1] <= yMax)
+                });
+                console.log(`x: [${xMin}, ${xMax}], y: [${yMin}, ${yMax}]`);
+                console.log(activeTiles);
+
             }
 
             addFile(filename, data) {
@@ -175,38 +229,10 @@
 
                 this.tiles[[tile.x, tile.y]] = tile;
 
-                var tileCanvas = document.createElement("canvas");
-                tileCanvas.id = tile.id.toString();
-
-                var size = Math.floor(TILE_WIDTH * BITMAP_WIDTH / ZOOM_LEVEL)
-                size = size + 1; // FIXME
-                tileCanvas.width = size;
-                tileCanvas.height = size;
-
-                var ctx = tileCanvas.getContext("2d");
-
-                var blocks = Object.values(tile.blocks);
-                for (var i = 0; i < blocks.length; i++) {
-                    var block = blocks[i];
-                    for (var j = 0; j < BITMAP_WIDTH; j++) {
-                        for (var k = 0; k < BITMAP_WIDTH; k++) {
-                            var x = block.x * BITMAP_WIDTH + j;
-                            var y = block.y * BITMAP_WIDTH + k;
-                            x = Math.floor(x / ZOOM_LEVEL);
-                            y = Math.floor(y / ZOOM_LEVEL);
-                            if (block.is_visited(j, k)) {
-                                ctx.fillStyle = "#000000";
-                                ctx.fillRect(x, y, 1, 1);
-                            }
-
-                        }
-                    }
-                }
-
                 // load tile to map
                 map.addSource(tile.id.toString(), {
                     type: 'canvas',
-                    canvas: tileCanvas,
+                    canvas: tile.canvas,
                     animate: true,
                     coordinates: tile.bounds()
                 });
