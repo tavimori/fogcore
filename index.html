@@ -170,6 +170,7 @@
                 }
 
                 this.canvas = document.createElement("canvas");
+                // this.canvas.style = "image-rendering: pixelated";
                 this.canvas.id = this.id.toString();
 
                 this.zoom = ZOOM_LEVEL;
@@ -190,12 +191,25 @@
 
                 ctx.scale(scale, scale);
                 // ctx.translate(0.5,0.5)
-                
+
+
+                ctx.imageSmoothingEnabled = false;
+                ctx.mozImageSmoothingEnabled = false;
+                ctx.webkitImageSmoothingEnabled = false;
+                ctx.msImageSmoothingEnabled = false;
+
                 ctx.fillStyle = "#000000";
+                // draw grid for tile
                 ctx.strokeRect(0, 0, size, size);
                 var blocks = Object.values(this.blocks);
                 for (var i = 0; i < blocks.length; i++) {
                     var block = blocks[i];
+                    // draw grid for block
+                    ctx.strokeRect(Math.floor(block.x * BITMAP_WIDTH / this.zoom),
+                        Math.floor(block.y * BITMAP_WIDTH / this.zoom),
+                        Math.floor(BITMAP_WIDTH / this.zoom),
+                        Math.floor(BITMAP_WIDTH / this.zoom)
+                    );
                     for (var j = 0; j < BITMAP_WIDTH; j++) {
                         for (var k = 0; k < BITMAP_WIDTH; k++) {
                             var x = block.x * BITMAP_WIDTH + j;
@@ -212,8 +226,10 @@
             }
 
             setZoom(zoom) {
-                this.zoom = zoom;
-                this.renderCanvas();
+                if (zoom != this.zoom) {
+                    this.zoom = zoom;
+                    this.renderCanvas();
+                }
             }
 
             bounds() {
@@ -271,7 +287,7 @@
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(2**Math.floor(13 - mapRoom), 1);
+                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 1);
                 activeTiles.forEach(tile => tile.setZoom(fogRoom));
                 // console.log(`zoom: ${zoom}`);
                 // if (zoom < 8) {
@@ -310,7 +326,7 @@
                     });
                 } catch (e) {
                     console.log(`${filename} is not a valid tile file.`)
-                    // console.log(e)
+                    console.log(e)
                 }
 
 
