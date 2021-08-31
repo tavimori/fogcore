@@ -25,6 +25,7 @@
             width: 100%;
         }
 
+        /* 
         .map-overlay {
             font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
             position: absolute;
@@ -41,10 +42,33 @@
             border-radius: 3px;
             padding: 10px;
             margin-bottom: 10px;
+        } */
+
+        .map-overlay {
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            position: absolute;
+            width: 25%;
+            top: 0;
+            left: 0;
+            padding: 10px;
+        }
+
+        .map-overlay .map-overlay-inner {
+            background-color: #fff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .map-overlay h2 {
+            line-height: 24px;
+            display: block;
+            margin: 0 0 10px;
         }
 
         #zdir {
-            border: 5px solid grey;
+            /* border: 5px solid grey; */
             width: 100%;
             height: 100%;
             /* background-color: grey; */
@@ -54,30 +78,8 @@
 </head>
 
 <body>
-    <style>
-        #menu {
-            position: absolute;
-            background: #efefef;
-            padding: 10px;
-            font-family: 'Open Sans', sans-serif;
-        }
-    </style>
-
     <div id='map'></div>
-    <div id="menu">
-        <input id="satellite-v9" type="radio" name="rtoggle" value="satellite" checked="checked">
-        <!-- See a list of Mapbox-hosted public styles at -->
-        <!-- https://docs.mapbox.com/api/maps/styles/#mapbox-styles -->
-        <label for="satellite-v9">satellite</label>
-        <input id="light-v10" type="radio" name="rtoggle" value="light">
-        <label for="light-v10">light</label>
-        <input id="dark-v10" type="radio" name="rtoggle" value="dark">
-        <label for="dark-v10">dark</label>
-        <input id="streets-v11" type="radio" name="rtoggle" value="streets">
-        <label for="streets-v11">streets</label>
-        <input id="outdoors-v11" type="radio" name="rtoggle" value="outdoors">
-        <label for="outdoors-v11">outdoors</label>
-    </div>
+
     <div class="map-overlay top">
         <div class="map-overlay-inner">
             <h2>Fork my world</h2>
@@ -85,19 +87,14 @@
         <div class="map-overlay-inner">
             <!-- <h2>Fog my world</h2> -->
             <div id="zdir">
-                <p>Please drag your "sync" folder here...</p>
+                <p>Please drag your "Sync" folder here, or click to choose every files inside it.</p>
             </div>
         </div>
-
     </div>
 
 
 
     <script>
-
-
-
-
         const FILENAME_MASK1 = "olhwjsktri";
         const FILENAME_MASK2 = "eizxdwknmo";
         var FILENAME_ENCODING = {};
@@ -273,7 +270,7 @@
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(Math.floor(15 - mapRoom), 1);
+                var fogRoom = Math.max(Math.floor(45 - 3 * mapRoom), 1);
                 activeTiles.forEach(tile => tile.setZoom(fogRoom));
                 // console.log(`zoom: ${zoom}`);
                 // if (zoom < 8) {
@@ -293,23 +290,29 @@
             }
 
             addFile(filename, data) {
-                var tile = new Tile(filename, data)
+                try {
+                    var tile = new Tile(filename, data)
 
-                this.tiles[[tile.x, tile.y]] = tile;
+                    this.tiles[[tile.x, tile.y]] = tile;
 
-                // load tile to map
-                map.addSource(tile.id.toString(), {
-                    type: 'canvas',
-                    canvas: tile.canvas,
-                    animate: true,
-                    coordinates: tile.bounds()
-                });
+                    // load tile to map
+                    map.addSource(tile.id.toString(), {
+                        type: 'canvas',
+                        canvas: tile.canvas,
+                        animate: true,
+                        coordinates: tile.bounds()
+                    });
 
-                map.addLayer({
-                    id: tile.id.toString(),
-                    type: 'raster',
-                    source: tile.id.toString()
-                });
+                    map.addLayer({
+                        id: tile.id.toString(),
+                        type: 'raster',
+                        source: tile.id.toString()
+                    });
+                } catch (e) {
+                    console.log(`${filename} is not a valid tile file.`)
+                    // console.log(e)
+                }
+
 
                 // map.flyTo({
                 //     center: tile.bounds()[0],
@@ -360,8 +363,8 @@
                     file.readData(
                         function (data) {
                             fogMap.addFile(file.name, data);
-                        }, 
-                        function (e) {console.log(`cannot read ${file.name}`)}
+                        },
+                        function (e) { console.log(`cannot read ${file.name}`) }
                     )
                 })
             })
@@ -386,10 +389,13 @@
                                 function (data) {
                                     fogMap.addFile(file.name, data);
                                 },
-                                function (e) {console.log(`cannot read ${file.name}`)}
+                                function (e) { console.log(`cannot read ${file.name}`) }
                             )
 
                         } else {
+                            console.log(`${file.name} is a folder?`);
+                            // file.listEntries(showfilenames, error)
+                            // debugger;
                         }
 
                     });
@@ -409,19 +415,6 @@
             });
 
         });
-
-
-
-
-        const layerList = document.getElementById('menu');
-        const inputs = layerList.getElementsByTagName('input');
-
-        for (const input of inputs) {
-            input.onclick = (layer) => {
-                const layerId = layer.target.id;
-                map.setStyle('mapbox://styles/mapbox/' + layerId);
-            };
-        }
 
     </script>
 </body>
