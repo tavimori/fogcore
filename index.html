@@ -142,9 +142,10 @@
         }
 
         class Tile {
-            constructor(filename, data) {
+            constructor(filename, data, map) {
 
                 // TODO: try catch
+                this.filename = filename;
                 this.id = filename.slice(4, -2).split("").map(idMasked => FILENAME_ENCODING[idMasked]).join("");
                 this.x = this.id % MAP_WIDTH;
                 this.y = Math.floor(this.id / MAP_WIDTH);
@@ -153,6 +154,8 @@
 
                 // TODO: try catch
                 this.data = pako.inflate(data);
+
+                this.map = map;
 
                 var header = new Uint16Array(this.data.slice(0, TILE_HEADER_SIZE).buffer)
                 this.blocks = {}
@@ -173,8 +176,26 @@
                 // this.canvas.style = "image-rendering: pixelated";
                 this.canvas.id = this.id.toString();
 
+                //
+                // this.focusx
+                this.hdCanvas = document.createElement("canvas");
+                this.hdCanvas.id = this.id.toString() + "hd";
+
                 this.zoom = ZOOM_LEVEL;
                 this.renderCanvas();
+
+                // load tile to map
+                map.addSource(this.id.toString(), {
+                    type: 'canvas',
+                    canvas: this.canvas,
+                    coordinates: this.bounds()
+                });
+
+                map.addLayer({
+                    id: this.id.toString(),
+                    type: 'raster',
+                    source: this.id.toString()
+                });
             }
 
             renderCanvas() {
@@ -184,6 +205,7 @@
 
                 // Set actual size in memory (scaled to account for extra pixel density).
                 var scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
+                // scale = 4;
                 this.canvas.width = Math.floor(size * scale);
                 this.canvas.height = Math.floor(size * scale);
 
@@ -201,35 +223,67 @@
                 ctx.fillStyle = "#000000";
                 // draw grid for tile
                 ctx.strokeRect(0, 0, size, size);
+
+                // // draw id/filename of tile
+                // ctx.fillStyle = "#FFFFFF";
+                // ctx.fillRect(10, 10, 350, 50);
+                // ctx.fillStyle = "#000000";
+                // ctx.font = "24px serif";
+                // ctx.fillText(`${this.id}/${this.filename}`, 15, 40);
+
                 var blocks = Object.values(this.blocks);
                 for (var i = 0; i < blocks.length; i++) {
                     var block = blocks[i];
-                    // draw grid for block
-                    ctx.strokeRect(Math.floor(block.x * BITMAP_WIDTH / this.zoom),
-                        Math.floor(block.y * BITMAP_WIDTH / this.zoom),
-                        Math.floor(BITMAP_WIDTH / this.zoom),
-                        Math.floor(BITMAP_WIDTH / this.zoom)
-                    );
-                    for (var j = 0; j < BITMAP_WIDTH; j++) {
-                        for (var k = 0; k < BITMAP_WIDTH; k++) {
-                            var x = block.x * BITMAP_WIDTH + j;
-                            var y = block.y * BITMAP_WIDTH + k;
-                            x = Math.floor(x / this.zoom);
-                            y = Math.floor(y / this.zoom);
-                            if (block.is_visited(j, k)) {
-                                ctx.fillRect(x, y, 1, 1);
-                            }
 
+                    if (this.zoom >= BITMAP_WIDTH) {
+                        // no need to draw points
+                        var x = block.x * BITMAP_WIDTH;
+                        var y = block.y * BITMAP_WIDTH;
+                        x = Math.floor(x / this.zoom);
+                        y = Math.floor(y / this.zoom);
+                        ctx.fillRect(x, y, 1, 1);
+                    } else {
+                        // draw grid for block
+                        ctx.strokeRect(Math.floor(block.x * BITMAP_WIDTH / this.zoom),
+                            Math.floor(block.y * BITMAP_WIDTH / this.zoom),
+                            Math.floor(BITMAP_WIDTH / this.zoom),
+                            Math.floor(BITMAP_WIDTH / this.zoom)
+                        );
+                        for (var j = 0; j < BITMAP_WIDTH; j++) {
+                            for (var k = 0; k < BITMAP_WIDTH; k++) {
+                                var x = block.x * BITMAP_WIDTH + j;
+                                var y = block.y * BITMAP_WIDTH + k;
+                                x = Math.floor(x / this.zoom);
+                                y = Math.floor(y / this.zoom);
+                                if (block.is_visited(j, k)) {
+                                    ctx.fillRect(x, y, 1, 1);
+                                }
+                            }
                         }
                     }
+
+
                 }
             }
 
             setZoom(zoom) {
                 if (zoom != this.zoom) {
+                    // TODO: perhaps we need a zoomed canvas for tile in focus
                     this.zoom = zoom;
                     this.renderCanvas();
                 }
+            }
+
+            setFocusArea(xMinPercent, xMaxPercent, yMinPercent, yMaxPercent) {
+                console.log(`${xMinPercent}, ${xMaxPercent}, ${yMinPercent}, ${yMaxPercent}`);
+                var xMinInt = Math.floor(xMinPercent * TILE_WIDTH);
+                var xMaxInt = Math.ceil(xMaxPercent * TILE_WIDTH) - 1;
+
+                var yMinInt = Math.floor(yMinPercent * TILE_WIDTH);
+                var yMaxInt = Math.ceil(yMaxPercent * TILE_WIDTH) - 1;
+
+                var activeBlocks = Object.values(this.blocks).filter(block => (block.x >= xMinInt) && (block.x <= xMaxInt) && (block.y >= yMinInt) && (block.y <= yMaxInt));
+                console.log(activeBlocks);
             }
 
             bounds() {
@@ -277,29 +331,30 @@
                 var ne = tile_lng_lat_to_x_y(bounds._ne.lng, bounds._ne.lat);
 
                 // FIXME: check if the region across lng=0
-                var xMin = Math.floor(sw[0]);
-                var xMax = Math.ceil(ne[0]) - 1;
+                var xMin = sw[0];
+                var xMax = ne[0];
 
-                var yMin = Math.floor(ne[1]);
-                var yMax = Math.ceil(sw[1]) - 1;
+                var yMin = ne[1];
+                var yMax = (sw[1]);
 
-                var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMin) && (tile.x <= xMax) && (tile.y >= yMin) && (tile.y <= yMax));
+                var xMinInt = Math.floor(xMin);
+                var xMaxInt = Math.ceil(xMax) - 1;
+
+                var yMinInt = Math.floor(yMin);
+                var yMaxInt = Math.ceil(yMax) - 1;
+
+                // FIXME: lng cross 0
+                var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMinInt) && (tile.x <= xMaxInt) && (tile.y >= yMinInt) && (tile.y <= yMaxInt));
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 1);
-                activeTiles.forEach(tile => tile.setZoom(fogRoom));
-                // console.log(`zoom: ${zoom}`);
-                // if (zoom < 8) {
-                //     activeTiles.forEach(tile => tile.setZoom(20));
-                // } else if (zoom < 10) {
-                //     activeTiles.forEach(tile => tile.setZoom(12));
-                // } else if (zoom < 12) {
-                //     activeTiles.forEach(tile => tile.setZoom(4));
-                // } else {
-                //     console.log("set zoom");
-                //     activeTiles.forEach(tile => tile.setZoom(1));
-                // }
+                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 4);
+                activeTiles.forEach(tile => {
+                    // FIXME: lng cross 0
+                    tile.setFocusArea(Math.max(xMin - tile.x, 0), Math.min(xMax - tile.x, 1), Math.max(yMin - tile.y, 0), Math.min(yMax - tile.y, 1))
+                    tile.setZoom(fogRoom);
+                });
+
 
                 console.log(`x: [${xMin}, ${xMax}], y: [${yMin}, ${yMax}]`);
                 console.log(activeTiles);
@@ -308,22 +363,11 @@
 
             addFile(filename, data) {
                 try {
-                    var tile = new Tile(filename, data)
+                    var tile = new Tile(filename, data, map)
 
                     this.tiles[[tile.x, tile.y]] = tile;
 
-                    // load tile to map
-                    map.addSource(tile.id.toString(), {
-                        type: 'canvas',
-                        canvas: tile.canvas,
-                        coordinates: tile.bounds()
-                    });
 
-                    map.addLayer({
-                        id: tile.id.toString(),
-                        type: 'raster',
-                        source: tile.id.toString()
-                    });
                 } catch (e) {
                     console.log(`${filename} is not a valid tile file.`)
                     console.log(e)
@@ -346,7 +390,8 @@
             container: 'map',
             style: 'mapbox://styles/mapbox/streets-v11',
             center: [114.20592531593752, 22.690129049232496],
-            zoom: 10
+            zoom: 10,
+            antialias: false
         });
 
 
