@@ -134,11 +134,13 @@
 
                 this.canvas = document.createElement("canvas");
                 this.canvas.id = this.id.toString();
+
+                this.zoom = ZOOM_LEVEL;
                 this.renderCanvas();
             }
 
             renderCanvas() {
-                var size = Math.floor(TILE_WIDTH * BITMAP_WIDTH / ZOOM_LEVEL)
+                var size = Math.floor(TILE_WIDTH * BITMAP_WIDTH / this.zoom)
                 size = size + 1; // FIXME
                 this.canvas.width = size;
                 this.canvas.height = size;
@@ -152,8 +154,8 @@
                         for (var k = 0; k < BITMAP_WIDTH; k++) {
                             var x = block.x * BITMAP_WIDTH + j;
                             var y = block.y * BITMAP_WIDTH + k;
-                            x = Math.floor(x / ZOOM_LEVEL);
-                            y = Math.floor(y / ZOOM_LEVEL);
+                            x = Math.floor(x / this.zoom);
+                            y = Math.floor(y / this.zoom);
                             if (block.is_visited(j, k)) {
                                 ctx.fillStyle = "#000000";
                                 ctx.fillRect(x, y, 1, 1);
@@ -162,6 +164,11 @@
                         }
                     }
                 }
+            }
+
+            setZoom(zoom) {
+                this.zoom = zoom;
+                this.renderCanvas();
             }
 
             bounds() {
@@ -215,10 +222,22 @@
                 var yMin = Math.floor(ne[1]);
                 var yMax = Math.floor(sw[1]);
 
-                var activeTiles = Object.keys(this.tiles).filter(keyString => {
-                    let key = keyString.split(",").map(x => parseInt(x));
-                    return (key[0] >= xMin) && (key[0] <= xMax) && (key[1] >= yMin) && (key[1] <= yMax)
-                });
+                var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMin) && (tile.x <= xMax) && (tile.y >= yMin) && (tile.y <= yMax));
+
+
+                var zoom = this.map.getZoom();
+                console.log(`zoom: ${zoom}`);
+                if (zoom < 8) {
+                    activeTiles.forEach(tile => tile.setZoom(20));
+                } else if (zoom < 10) {
+                    activeTiles.forEach(tile => tile.setZoom(12));
+                } else if (zoom  < 12) {
+                    activeTiles.forEach(tile => tile.setZoom(4));
+                } else {
+                    console.log("set zoom");
+                    activeTiles.forEach(tile => tile.setZoom(1));
+                }
+
                 console.log(`x: [${xMin}, ${xMax}], y: [${yMin}, ${yMax}]`);
                 console.log(activeTiles);
 
