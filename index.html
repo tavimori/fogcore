@@ -190,7 +190,9 @@
 
                 ctx.scale(scale, scale);
                 // ctx.translate(0.5,0.5)
-
+                
+                ctx.fillStyle = "#000000";
+                ctx.strokeRect(0, 0, size, size);
                 var blocks = Object.values(this.blocks);
                 for (var i = 0; i < blocks.length; i++) {
                     var block = blocks[i];
@@ -201,7 +203,6 @@
                             x = Math.floor(x / this.zoom);
                             y = Math.floor(y / this.zoom);
                             if (block.is_visited(j, k)) {
-                                ctx.fillStyle = "#000000";
                                 ctx.fillRect(x, y, 1, 1);
                             }
 
@@ -299,7 +300,6 @@
                     map.addSource(tile.id.toString(), {
                         type: 'canvas',
                         canvas: tile.canvas,
-                        animate: true,
                         coordinates: tile.bounds()
                     });
 
