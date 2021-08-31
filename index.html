@@ -73,7 +73,7 @@
         const BLOCK_SIZE = BLOCK_BITMAP_SIZE + BLOCK_EXTRA_DATA
         const BITMAP_WIDTH = 64
 
-        const ZOOM_LEVEL = 4
+        const ZOOM_LEVEL = 12
 
         class Block {
             constructor(x, y, data) {
@@ -94,7 +94,6 @@
 
         function tile_x_y_to_lng_lat(x, y) {
             lng = x / 512 * 360 - 180;
-            // y : 0-256-512 lat : 90-0--90
             lat = Math.atan(Math.sinh(Math.PI - 2 * Math.PI * y / 512)) * 180 / Math.PI;
             return [lng, lat];
         }
@@ -113,9 +112,6 @@
                 this.data = pako.inflate(data);
 
                 var header = new Uint16Array(this.data.slice(0, TILE_HEADER_SIZE).buffer)
-                // headerBuf = new Buffer(this.data.slice(0, TILE_HEADER_SIZE))
-                // header = new Uint16Array(headerBuf.buffer, buf.byteOffset, buf.byteLength / Uint16Array.BYTES_PER_ELEMENT);
-                // debugger;
                 this.blocks = {}
 
                 for (var i = 0; i < header.length; i++) {
@@ -129,7 +125,6 @@
                         this.blocks[[block_x, block_y]] = new Block(block_x, block_y, block_data)
                     }
                 }
-                // console.log(this.data);
             }
 
             bounds() {
@@ -137,7 +132,6 @@
                 let se = tile_x_y_to_lng_lat(this.x + 1, this.y + 1);
                 let ne = tile_x_y_to_lng_lat(this.x + 1, this.y);
                 let nw = tile_x_y_to_lng_lat(this.x, this.y);
-                // return [sw, se, ne, nw];
                 return [nw, ne, se, sw];
             }
 
@@ -146,10 +140,40 @@
             constructor(map) {
                 this.tiles = {};
                 this.map = map;
+
+                map.on('resize', () => {
+                    console.log('A resize event occurred.');
+                    // console.log(getZoom())
+                    this.optimizeView();
+                });
+
+                map.on('remove', () => {
+                    console.log('A remove event occurred.');
+                    this.optimizeView();
+                });
+
+                map.on('dragend', () => {
+                    console.log('A dragend event occurred.');
+                    this.optimizeView();
+                });
+
+                map.on('zoomend', () => {
+                    console.log('A zoomend event occurred.');
+                    this.optimizeView();
+                });
+
+
             }
 
-            addTile(x, y, tile) {
-                this.tiles[[x, y]] = tile;
+            optimizeView() {
+                console.log("optimizing view...");
+                console.log(this.map.getBounds())
+            }
+
+            addFile(filename, data) {
+                var tile = new Tile(filename, data)
+
+                this.tiles[[tile.x, tile.y]] = tile;
 
                 var tileCanvas = document.createElement("canvas");
                 tileCanvas.id = tile.id.toString();
@@ -173,17 +197,12 @@
                             if (block.is_visited(j, k)) {
                                 ctx.fillStyle = "#000000";
                                 ctx.fillRect(x, y, 1, 1);
-                                // im.putpixel((x, y), ImageColor.getcolor('black', 'RGB'))
                             }
 
                         }
                     }
                 }
 
-                // ctx.fillRect(30, 30, 100, 100);
-
-                // document.body.appendChild(tileCanvas);
-                // debugger;
                 // load tile to map
                 map.addSource(tile.id.toString(), {
                     type: 'canvas',
@@ -198,10 +217,10 @@
                     source: tile.id.toString()
                 });
 
-                map.flyTo({
-                    center: tile.bounds()[0],
-                    essential: true // this animation is considered essential with respect to prefers-reduced-motion
-                });
+                // map.flyTo({
+                //     center: tile.bounds()[0],
+                //     essential: true // this animation is considered essential with respect to prefers-reduced-motion
+                // });
             }
         }
 
@@ -248,8 +267,7 @@
 
                             file.readData(
                                 function (data) {
-                                    var tile = new Tile(file.name, data)
-                                    fogMap.addTile(tile.x, tile.y, tile);
+                                    fogMap.addFile(file.name, data);
                                 },
                                 function (e) { alert('Terrible error!') }
                             )
