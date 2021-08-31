@@ -80,7 +80,7 @@
     </div>
     <div class="map-overlay top">
         <div class="map-overlay-inner">
-            <h2>Fog my world</h2>
+            <h2>Fork my world</h2>
         </div>
         <div class="map-overlay-inner">
             <!-- <h2>Fog my world</h2> -->
@@ -88,7 +88,7 @@
                 <p>Please drag your "sync" folder here...</p>
             </div>
         </div>
-       
+
     </div>
 
 
@@ -272,18 +272,20 @@
                 var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMin) && (tile.x <= xMax) && (tile.y >= yMin) && (tile.y <= yMax));
 
 
-                var zoom = this.map.getZoom();
-                console.log(`zoom: ${zoom}`);
-                if (zoom < 8) {
-                    activeTiles.forEach(tile => tile.setZoom(20));
-                } else if (zoom < 10) {
-                    activeTiles.forEach(tile => tile.setZoom(12));
-                } else if (zoom < 12) {
-                    activeTiles.forEach(tile => tile.setZoom(4));
-                } else {
-                    console.log("set zoom");
-                    activeTiles.forEach(tile => tile.setZoom(1));
-                }
+                var mapRoom = this.map.getZoom();
+                var fogRoom = Math.max(Math.floor(15 - mapRoom), 1);
+                activeTiles.forEach(tile => tile.setZoom(fogRoom));
+                // console.log(`zoom: ${zoom}`);
+                // if (zoom < 8) {
+                //     activeTiles.forEach(tile => tile.setZoom(20));
+                // } else if (zoom < 10) {
+                //     activeTiles.forEach(tile => tile.setZoom(12));
+                // } else if (zoom < 12) {
+                //     activeTiles.forEach(tile => tile.setZoom(4));
+                // } else {
+                //     console.log("set zoom");
+                //     activeTiles.forEach(tile => tile.setZoom(1));
+                // }
 
                 console.log(`x: [${xMin}, ${xMax}], y: [${yMin}, ${yMax}]`);
                 console.log(activeTiles);
@@ -348,12 +350,23 @@
         map.on('load', function () {
             var fogMap = new FogMap(map);
 
-            var zone = new FileDrop('zdir', { input: false });
+            // var zone = new FileDrop('zdir', { input: false });
+            var zone = new FileDrop('zdir');
+            zone.multiple(true);
+
+            zone.event('send', function (files) {
+                files.each(function (file) {
+                    console.log(file.name + ' (' + file.size + ') bytes')
+                    file.readData(
+                        function (data) {
+                            fogMap.addFile(file.name, data);
+                        }, 
+                        function (e) {console.log(`cannot read ${file.name}`)}
+                    )
+                })
+            })
 
             zone.event('upload', function (e) {
-                while (cleared = zone.el.firstChild) {
-                    zone.el.removeChild(zone.el.firstChild);
-                }
 
                 var error = function () { alert('Problem reading the file system.'); }
 
@@ -362,37 +375,23 @@
                     files.each(function (file) {
                         // file is FileDrop.File with native objects accessible
                         // as file.nativeFile and file.nativeEntry.
-                        var node = document.createElement('p');
-                        node.innerText = file.name
+                        // var node = document.createElement('p');
+                        // node.innerText = file.name
 
                         if (file.nativeFile) {
                             // This is a file. We can use any FileDrop method here
                             // like sendTo() and readData() - see below.
-                            node.innerText += ' (' + file.size + ')';
 
                             file.readData(
                                 function (data) {
                                     fogMap.addFile(file.name, data);
                                 },
-                                function (e) { alert('Terrible error!') }
+                                function (e) {console.log(`cannot read ${file.name}`)}
                             )
-                            // var tile = new Tile(file.name, )
 
                         } else {
-                            // This is a directory - it has no File API object.
-                            node.innerHTML = '<b>' + node.innerHTML + '/</b>';
                         }
 
-                        zone.el.appendChild(node);
-                    });
-
-                    // Let's show thumbs of images using FileDrop.File methods.
-                    files.images().each(function (file) {
-                        file.readDataURI(function (uri) {
-                            var img = new Image;
-                            img.src = uri;
-                            zone.el.appendChild(img);
-                        });
                     });
                 };
 
