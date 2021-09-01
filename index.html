@@ -354,7 +354,7 @@
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 1);
+                var fogRoom = Math.max(2 ** Math.floor(15 - mapRoom), 1);
                 activeTiles.forEach(tile => {
                     // FIXME: lng cross 0
                     tile.setFocusArea(Math.max(xMin - tile.x, 0), Math.min(xMax - tile.x, 1), Math.max(yMin - tile.y, 0), Math.min(yMax - tile.y, 1))
