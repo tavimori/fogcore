@@ -10,7 +10,7 @@
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.css' rel='stylesheet' />
 
     <script src="filedrop-min.js"></script>
-    <script src="pako.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
 
     <style>
         body {
@@ -194,7 +194,10 @@
                 map.addLayer({
                     id: this.id.toString(),
                     type: 'raster',
-                    source: this.id.toString()
+                    source: this.id.toString(),
+                    paint: {
+                        'raster-resampling': 'nearest'
+                    }
                 });
             }
 
@@ -205,13 +208,15 @@
 
                 // Set actual size in memory (scaled to account for extra pixel density).
                 var scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
-                // scale = 4;
+                scale = 1; // FIXME: recheck whether to enable this
                 this.canvas.width = Math.floor(size * scale);
                 this.canvas.height = Math.floor(size * scale);
 
                 var ctx = this.canvas.getContext("2d");
 
                 ctx.scale(scale, scale);
+
+                // ctx.filter = "none";
                 // ctx.translate(0.5,0.5)
 
 
@@ -348,7 +353,7 @@
 
 
                 var mapRoom = this.map.getZoom();
-                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 4);
+                var fogRoom = Math.max(2 ** Math.floor(13 - mapRoom), 1);
                 activeTiles.forEach(tile => {
                     // FIXME: lng cross 0
                     tile.setFocusArea(Math.max(xMin - tile.x, 0), Math.min(xMax - tile.x, 1), Math.max(yMin - tile.y, 0), Math.min(yMax - tile.y, 1))
