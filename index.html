@@ -120,6 +120,16 @@
                 this.extraData = data.slice(BLOCK_BITMAP_SIZE, BLOCK_SIZE);
             }
 
+            get region() {
+                let regionChar0 = String.fromCharCode((this.extraData[0] >> 3) + "?".charCodeAt(0));
+                let regionChar1 = String.fromCharCode((((this.extraData[0] & 0x7) << 2) | ((this.extraData[1] & 0xC0) >> 6)) + "?".charCodeAt(0));
+                return regionChar0 + regionChar1;
+            }
+
+            get count() {
+                return (new DataView(this.extraData.buffer, 1, 2).getInt16(0, false) & 0x3FFF) >> 1;
+            }
+
             is_visited(x, y) {
                 var bit_offset = 7 - x % 8;
                 var i = Math.floor(x / 8);
@@ -157,8 +167,9 @@
 
                 this.map = map;
 
-                var header = new Uint16Array(this.data.slice(0, TILE_HEADER_SIZE).buffer)
-                this.blocks = {}
+                var header = new Uint16Array(this.data.slice(0, TILE_HEADER_SIZE).buffer);
+                this.blocks = {};
+                this.regionCount = {};
 
                 for (var i = 0; i < header.length; i++) {
                     var block_idx = header[i];
@@ -168,7 +179,10 @@
                         let start_offset = TILE_HEADER_SIZE + (block_idx - 1) * BLOCK_SIZE
                         let end_offset = start_offset + BLOCK_SIZE
                         var block_data = this.data.slice(start_offset, end_offset);
-                        this.blocks[[block_x, block_y]] = new Block(block_x, block_y, block_data)
+                        let block = new Block(block_x, block_y, block_data)
+                        // console.log(`${block.region}: ${block.count}`);
+                        this.blocks[[block_x, block_y]] = block;
+                        this.regionCount[block.region] = (this.regionCount[block.region] || 0) + block.count
                     }
                 }
 
@@ -305,6 +319,7 @@
             constructor(map) {
                 this.tiles = {};
                 this.map = map;
+                this.regionCount = {};
 
                 map.on('resize', () => {
                     console.log('A resize event occurred.');
@@ -372,6 +387,10 @@
                     var tile = new Tile(filename, data, map)
 
                     this.tiles[[tile.x, tile.y]] = tile;
+                    for (const [region, count] of Object.entries(tile.regionCount)) {
+                        this.regionCount[region] = (this.regionCount[region] || 0) + count
+                    }
+                    console.log(this.regionCount);
 
 
                 } catch (e) {
