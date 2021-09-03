@@ -531,7 +531,27 @@
             }
         }
 
+        // Control implemented as ES6 class
+        class DrawControl {
+            onAdd(map) {
+                this._map = map;
+                this._container = document.createElement('div');
+                this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+                // this._container.textContent = 'ERASER';
+                this._defogButton = document.createElement('button')
+                this._container.appendChild(this._defogButton);
 
+                this._fogButton = document.createElement('button')
+                this._container.appendChild(this._fogButton);
+
+                return this._container;
+            }
+
+            onRemove() {
+                this._container.parentNode.removeChild(this._container);
+                this._map = undefined;
+            }
+        }
 
 
 
@@ -566,6 +586,7 @@
             customAttribution: 'Map design by me'
         }));
 
+        map.addControl(new DrawControl());
 
         map.on('load', function () {
             var fogMap = new FogMap(map);
