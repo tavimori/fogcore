@@ -169,7 +169,7 @@
 
                 // https://github.com/mapbox/mapbox-gl-js/issues/9873              
                 if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
-                    console.log("render for first time!")
+                    // console.log("render for first time!")
                     if (zoom == 1) {
                         zoom = 3;
                     } else {
@@ -181,7 +181,7 @@
                 const canvas = this.canvas;
 
                 const size = Math.floor(BITMAP_WIDTH / zoom)
-                console.log(`set size to ... ${size} zoom ${zoom}`);
+                // console.log(`set size to ... ${size} zoom ${zoom}`);
 
                 // Set actual size in memory (scaled to account for extra pixel density).
                 const scale = window.devicePixelRatio; // Change to 1 on retina screens to see blurry canvas.
@@ -191,7 +191,7 @@
                 ctx.scale(scale, scale);
                 ctx.fillStyle = "#000000";
 
-                ctx.strokeRect(0, 0, size, size);
+                // ctx.strokeRect(0, 0, size, size);
 
                 if (zoom >= BITMAP_WIDTH) {
                     // no need to draw points
@@ -208,7 +208,7 @@
                         }
                     }
                 }
-                console.log(`block [${this.x}, ${this.y}] done`);
+                // console.log(`block [${this.x}, ${this.y}] done`);
             }
         }
 
@@ -314,7 +314,7 @@
                 let zoom = this.zoom;
                 // https://github.com/mapbox/mapbox-gl-js/issues/9873              
                 if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
-                    console.log("render for first time!")
+                    // console.log("render for first time!")
                     if (zoom == 1) {
                         zoom = 3;
                     } else {
@@ -343,7 +343,7 @@
                 // ctx.clearRect(0,0,50,50);
                 ctx.fillStyle = "#000000";
                 // draw grid for tile
-                ctx.strokeRect(0, 0, size, size);
+                // ctx.strokeRect(0, 0, size, size);
                 // ctx.strokeRect(0, 0, size/2, size/2);
 
                 // // draw id/filename of tile
@@ -386,7 +386,7 @@
 
 
                 }
-                console.log(`tile render finished ${this.id} size: ${size}`);
+                // console.log(`tile render finished ${this.id} size: ${size}`);
             }
 
             render() {
@@ -401,12 +401,10 @@
                     this.zoom = zoom;
                     this.renderCanvas();
                 } else {
-                    console.log(`prepare to set zoom to ${zoom}`);
                     this.zoom = zoom;
                     this.clearCanvas();
                     for (const block of this.activeBlocks) {
                         block.renderEnabled = true;
-                        console.log(`prepare to call zoom @ ${zoom}`);
                         block.render();
                     }
                 }
@@ -497,15 +495,15 @@
 
                 var mapZoom = this.map.getZoom();
                 var fogZoom = Math.max(2 ** Math.floor(15 - mapZoom), 1);
-                console.log(`fog zoom is ${fogZoom}`)
+                // console.log(`fog zoom is ${fogZoom}`)
                 activeTiles.forEach(tile => {
                     // FIXME: lng cross 0
                     tile.render();
                 });
 
 
-                console.log(`x: [${this.xMin}, ${this.xMax}], y: [${this.yMin}, ${this.yMax}]`);
-                console.log(activeTiles);
+                // console.log(`x: [${this.xMin}, ${this.xMax}], y: [${this.yMin}, ${this.yMax}]`);
+                // console.log(activeTiles);
 
             }
 
