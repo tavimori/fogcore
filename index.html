@@ -581,7 +581,7 @@
                 this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
                 // this._container.textContent = 'ERASER';
                 this._normalModeButton = document.createElement('button')
-                this._normalModeButton.textContent = "N";
+                this._normalModeButton.textContent = "Nml";
                 this._normalModeButton.addEventListener("click", event => {
                     console.log("reset to normal mode");
                     this.disableEdit();
@@ -589,15 +589,16 @@
                 this._container.appendChild(this._normalModeButton);
 
                 this._defogButton = document.createElement('button')
-                this._defogButton.textContent = "DF";
-                this._defogButton.addEventListener("click", event => {
-                    console.log("set to defog mode");
-                    this.enableEdit("DF");
-                });
+                this._defogButton.textContent = "DFg";
+                this._defogButton.setAttribute("disabled", "");
+                // this._defogButton.addEventListener("click", event => {
+                //     console.log("set to defog mode");
+                //     this.enableEdit("DF");
+                // });
                 this._container.appendChild(this._defogButton);
 
                 this._fogButton = document.createElement('button')
-                this._fogButton.textContent = "F";
+                this._fogButton.textContent = "Fog";
                 this._fogButton.addEventListener("click", event => {
                     console.log("set to fog mode");
                     this.enableEdit("F");
