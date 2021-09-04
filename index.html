@@ -538,10 +538,28 @@
                 this._container = document.createElement('div');
                 this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
                 // this._container.textContent = 'ERASER';
+                this._normalModeButton = document.createElement('button')
+                this._normalModeButton.textContent = "N";
+                this._normalModeButton.addEventListener("click", event => {
+                    console.log("reset to normal mode");
+                    this.disableEdit();
+                });
+                this._container.appendChild(this._normalModeButton);
+
                 this._defogButton = document.createElement('button')
+                this._defogButton.textContent = "DF";
+                this._defogButton.addEventListener("click", event => {
+                    console.log("set to defog mode");
+                    this.enableEdit("DF");
+                });
                 this._container.appendChild(this._defogButton);
 
                 this._fogButton = document.createElement('button')
+                this._fogButton.textContent = "F";
+                this._fogButton.addEventListener("click", event => {
+                    console.log("set to fog mode");
+                    this.enableEdit("F");
+                });
                 this._container.appendChild(this._fogButton);
 
                 return this._container;
@@ -551,6 +569,49 @@
                 this._container.parentNode.removeChild(this._container);
                 this._map = undefined;
             }
+
+            enableEdit(mode) {
+                // disable box zoom
+                this._map.boxZoom.disable();
+                // disable pan drag
+                this._map.dragPan.disable();
+
+                this._map.on('mousemove', (e) => {
+                    this._map.getCanvas().style.cursor = 'cell'
+                    // this.onMouseMove(e);
+                })
+                // this._map.on('mouseleave', () => {
+                //     this._map.getCanvas().style.cursor = ''
+                // })
+            }
+
+            disableEdit(mode) {
+                this._map.boxZoom.enable();
+                this._map.dragPan.enable();
+                this._map.on('mousemove', () => {
+                    this._map.getCanvas().style.cursor = ''
+                })
+            }
+
+            onMouseDown(e) {
+                // this._start = 
+                // Continue the rest of the function if the shiftkey is pressed.
+                if ((e.shiftKey && e.button === 0)) {
+                    // box select mode
+                } else {
+                    // pointwise draw mode
+                }
+            }
+
+            onMouseMove(e) {
+                // TODO: check pointwise draw mode or block mode
+                // console.log(e.lngLat)
+            }
+
+            onMouseUp() {
+
+            }
+
         }
 
 
