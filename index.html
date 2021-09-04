@@ -128,6 +128,14 @@
                 return this.bitmap[i + j * 8] & (1 << bit_offset);
             }
 
+            // TODO: better codes needed!
+            set_visited(x,y,bit) {
+                const bit_offset = 7 - x % 8;
+                const i = Math.floor(x / 8);
+                const j = y;
+                this.bitmap[i + j * 8] = (this.bitmap[i + j * 8] & (~(1 << bit_offset))) | (bit<<bit_offset);
+            }
+
             get renderEnabled() {
                 return this.map.getLayer(this.name)
             }
@@ -160,6 +168,13 @@
                     if (this.map.getSource(this.name)) this.map.removeSource(this.name);
                     this.canvas = undefined;
                 }
+            }
+
+            addFogAt(xp,yp) {
+                const x = Math.floor(xp * BITMAP_WIDTH)
+                const y = Math.floor(yp * BITMAP_WIDTH)
+                this.set_visited(x,y,0);
+                console.log("fog set!")
             }
 
 
@@ -419,6 +434,17 @@
                 return Object.values(this.blocks).filter(block => (block.x >= xMinInt) && (block.x <= xMaxInt) && (block.y >= yMinInt) && (block.y <= yMaxInt));
             }
 
+            addFogAt(xp, yp) {
+                const x = xp * TILE_WIDTH, y = yp * TILE_WIDTH
+                const blockX = Math.floor(x), blockY = Math.floor(y);
+                if (this.blocks[[blockX,blockY]]) {
+                    this.blocks[[blockX,blockY]].addFogAt(x-blockX, y-blockY);
+                    this.render();
+                } else {
+                    console.log("blocks not exists");
+                }
+            }
+
             get_block_bounds(block_x, block_y) {
                 let sw = tile_x_y_to_lng_lat(this.x + block_x / TILE_WIDTH, this.y + (block_y + 1) / TILE_WIDTH);
                 let se = tile_x_y_to_lng_lat(this.x + (block_x + 1) / TILE_WIDTH, this.y + (block_y + 1) / TILE_WIDTH);
@@ -529,10 +555,26 @@
                 //     essential: true // this animation is considered essential with respect to prefers-reduced-motion
                 // });
             }
+
+            addFogAt(lng, lat) {
+                const coord = tile_lng_lat_to_x_y(lng, lat)
+                const x = coord[0], y = coord[1];
+                // add fog only if the fog already be cleaned
+                const tileX = Math.floor(x), tileY = Math.floor(y);
+                if (this.tiles[[tileX, tileY]]) {
+                    this.tiles[[tileX, tileY]].addFogAt(x-tileX, y-tileY);
+                } else {
+                    console.log("tile not exists");
+                }
+            }
+
         }
 
         // Control implemented as ES6 class
         class DrawControl {
+            constructor (fogMap) {
+                this.fogMap = fogMap;
+            }
             onAdd(map) {
                 this._map = map;
                 this._container = document.createElement('div');
@@ -576,6 +618,8 @@
                 // disable pan drag
                 this._map.dragPan.disable();
 
+                this._map.on('mousedown', DrawControl.genMouseDownCallback(this));
+
                 this._map.on('mousemove', (e) => {
                     this._map.getCanvas().style.cursor = 'cell'
                     // this.onMouseMove(e);
@@ -593,25 +637,33 @@
                 })
             }
 
-            onMouseDown(e) {
-                // this._start = 
-                // Continue the rest of the function if the shiftkey is pressed.
-                if ((e.shiftKey && e.button === 0)) {
-                    // box select mode
-                } else {
-                    // pointwise draw mode
+            // FIXME: mouse up should be listened globally?
+            static genMouseDownCallback(controller) {
+                return (e) => {
+                    if ((e.shiftKey && e.button === 0)) {
+                        // box select mode
+                    } else {
+                        // pointwise draw mode
+                    }
+                    controller._mousemoveCallback = DrawControl.genMouseMoveCallback(controller)
+                    controller._map.on('mousemove', controller._mousemoveCallback)
+                    controller._map.on('mouseup', DrawControl.genMouseUpCallback(controller));
                 }
             }
 
-            onMouseMove(e) {
-                // TODO: check pointwise draw mode or block mode
-                // console.log(e.lngLat)
+            static genMouseMoveCallback(controller) {
+                return (e) => {
+                    console.log(e.lngLat)
+                    controller.fogMap.addFogAt(e.lngLat.lng, e.lngLat.lat);
+                }
             }
 
-            onMouseUp() {
-
+            static genMouseUpCallback(controller) {
+                return (e) => {
+                    // remove mouse move call back
+                    controller._map.off('mousemove', controller._mousemoveCallback);
+                }
             }
-
         }
 
 
@@ -623,9 +675,9 @@
             center: [114.20592531593752, 22.690129049232496],
             // center: [-74.03371051693314, 40.80102059524263],
             zoom: 10,
-            antialias: false
         });
 
+        var fogMap = new FogMap(map);
 
         // Add zoom and rotation controls to the map.
 
@@ -647,11 +699,9 @@
             customAttribution: 'Map design by me'
         }));
 
-        map.addControl(new DrawControl());
+        map.addControl(new DrawControl(fogMap));
 
         map.on('load', function () {
-            var fogMap = new FogMap(map);
-
             // var zone = new FileDrop('zdir', { input: false });
             var zone = new FileDrop('zdir');
             zone.multiple(true);
