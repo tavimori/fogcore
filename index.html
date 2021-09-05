@@ -53,6 +53,16 @@
             height: 100%;
             /* background-color: grey; */
         }
+
+        .boxdraw {
+            background: rgba(56, 135, 190, 0.1);
+            border: 2px solid #3887be;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+        }
     </style>
 
 </head>
@@ -129,11 +139,11 @@
             }
 
             // TODO: better codes needed!
-            set_visited(x,y,bit) {
+            set_visited(x, y, bit) {
                 const bit_offset = 7 - x % 8;
                 const i = Math.floor(x / 8);
                 const j = y;
-                this.bitmap[i + j * 8] = (this.bitmap[i + j * 8] & (~(1 << bit_offset))) | (bit<<bit_offset);
+                this.bitmap[i + j * 8] = (this.bitmap[i + j * 8] & (~(1 << bit_offset))) | (bit << bit_offset);
             }
 
             get renderEnabled() {
@@ -170,10 +180,10 @@
                 }
             }
 
-            addFogAt(xp,yp) {
+            addFogAt(xp, yp) {
                 const x = Math.floor(xp * BITMAP_WIDTH)
                 const y = Math.floor(yp * BITMAP_WIDTH)
-                this.set_visited(x,y,0);
+                this.set_visited(x, y, 0);
                 console.log("fog set!")
             }
 
@@ -295,9 +305,9 @@
                     id: `tile${this.id}`,
                     type: 'raster',
                     source: `tile${this.id}`,
-                    paint: {
-                        'raster-resampling': 'nearest'
-                    }
+                    // paint: {
+                    //     'raster-resampling': 'nearest'
+                    // }
                 });
             }
 
@@ -443,8 +453,8 @@
             addFogAt(xp, yp) {
                 const x = xp * TILE_WIDTH, y = yp * TILE_WIDTH
                 const blockX = Math.floor(x), blockY = Math.floor(y);
-                if (this.blocks[[blockX,blockY]]) {
-                    this.blocks[[blockX,blockY]].addFogAt(x-blockX, y-blockY);
+                if (this.blocks[[blockX, blockY]]) {
+                    this.blocks[[blockX, blockY]].addFogAt(x - blockX, y - blockY);
                     this.render();
                 } else {
                     console.log("blocks not exists");
@@ -499,7 +509,7 @@
             }
 
             get fogZoom() {
-                return Math.max(2 ** Math.floor(15 - this.map.getZoom()), 1);
+                return Math.max(2 ** Math.floor(14 - this.map.getZoom()), 1);
             }
 
             optimizeView() {
@@ -525,8 +535,8 @@
                 var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMinInt) && (tile.x <= xMaxInt) && (tile.y >= yMinInt) && (tile.y <= yMaxInt));
 
 
-                var mapZoom = this.map.getZoom();
-                var fogZoom = Math.max(2 ** Math.floor(15 - mapZoom), 1);
+                // var mapZoom = this.map.getZoom();
+                // var fogZoom = Math.max(2 ** Math.floor(12 - mapZoom), 1);
                 // console.log(`fog zoom is ${fogZoom}`)
                 activeTiles.forEach(tile => {
                     // FIXME: lng cross 0
@@ -568,7 +578,7 @@
                 // add fog only if the fog already be cleaned
                 const tileX = Math.floor(x), tileY = Math.floor(y);
                 if (this.tiles[[tileX, tileY]]) {
-                    this.tiles[[tileX, tileY]].addFogAt(x-tileX, y-tileY);
+                    this.tiles[[tileX, tileY]].addFogAt(x - tileX, y - tileY);
                 } else {
                     console.log("tile not exists");
                 }
@@ -578,11 +588,14 @@
 
         // Control implemented as ES6 class
         class DrawControl {
-            constructor (fogMap) {
+            constructor(fogMap) {
                 this.fogMap = fogMap;
             }
             onAdd(map) {
                 this._map = map;
+                this._canvas = map.getCanvasContainer();
+
+
                 this._container = document.createElement('div');
                 this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
                 // this._container.textContent = 'ERASER';
@@ -625,50 +638,129 @@
                 // disable pan drag
                 this._map.dragPan.disable();
 
-                this._map.on('mousedown', DrawControl.genMouseDownCallback(this));
+                // this._map.on('mousedown', DrawControl.genMouseDownCallback(this));
+                this._mousedownCallback = DrawControl.genMouseDownCallback(this)
+                this._canvas.addEventListener('mousedown', this._mousedownCallback, true);
+                this._canvas.style.cursor = 'cell';
 
-                this._map.on('mousemove', (e) => {
-                    this._map.getCanvas().style.cursor = 'cell'
-                    // this.onMouseMove(e);
-                })
+                // this._map.on('mousemove', (e) => {
+                //     this._map.getCanvas().style.cursor = 'cell'
+                //     // this.onMouseMove(e);
+                // })
                 // this._map.on('mouseleave', () => {
                 //     this._map.getCanvas().style.cursor = ''
                 // })
             }
 
-            disableEdit(mode) {
+            disableEdit() {
                 this._map.boxZoom.enable();
                 this._map.dragPan.enable();
-                this._map.on('mousemove', () => {
-                    this._map.getCanvas().style.cursor = ''
-                })
+                this._canvas.style.cursor = '';
+                // this._map.on('mousemove', () => {
+                //     this._map.getCanvas().style.cursor = ''
+                // })
+                this._canvas.removeEventListener('mousedown', this._mousedownCallback,true);
             }
 
             // FIXME: mouse up should be listened globally?
             static genMouseDownCallback(controller) {
                 return (e) => {
+                    // debugger;
                     if ((e.shiftKey && e.button === 0)) {
                         // box select mode
+                        console.log("enter box select mode");
+                        controller.boxSelect = true;
+                        controller.start = controller.mousePos(e);
                     } else {
                         // pointwise draw mode
+                        console.log("enter pointwise select mode");
+                        controller.boxSelect = false;
                     }
                     controller._mousemoveCallback = DrawControl.genMouseMoveCallback(controller)
-                    controller._map.on('mousemove', controller._mousemoveCallback)
-                    controller._map.on('mouseup', DrawControl.genMouseUpCallback(controller));
+                    // controller._map.on('mousemove', controller._mousemoveCallback)
+                    document.addEventListener("mousemove", controller._mousemoveCallback);
+                    controller._mouseupCallback = DrawControl.genMouseUpCallback(controller);
+                    document.addEventListener('mouseup', controller._mouseupCallback);
                 }
             }
 
             static genMouseMoveCallback(controller) {
                 return (e) => {
-                    console.log(e.lngLat)
-                    controller.fogMap.addFogAt(e.lngLat.lng, e.lngLat.lat);
+                    console.log("mouse moved")
+                    // debugger;
+                    const current = controller.mousePos(e);
+                    if (controller.boxSelect) {
+
+
+
+                        if (!controller._box) {
+                            controller._box = document.createElement('div');
+                            controller._box.classList.add('boxdraw');
+                            controller._canvas.appendChild(controller._box);
+                        }
+
+                        const start = controller.start;
+
+                        const minX = Math.min(start.x, current.x),
+                            maxX = Math.max(start.x, current.x),
+                            minY = Math.min(start.y, current.y),
+                            maxY = Math.max(start.y, current.y);
+
+                        // Adjust width and xy position of the box element ongoing
+                        const pos = `translate(${minX}px, ${minY}px)`;
+                        controller._box.style.transform = pos;
+                        controller._box.style.width = maxX - minX + 'px';
+                        controller._box.style.height = maxY - minY + 'px';
+                    } else {
+                        controller.finish(current)
+                        // console.log(e.lngLat)
+                        // // debugger;
+                        // const coordinate = controller._map.unproject(current);
+                        // // debugger;
+                        // controller.fogMap.addFogAt(coordinate.lng, coordinate.lat);
+                    }
+
+
                 }
             }
 
             static genMouseUpCallback(controller) {
                 return (e) => {
                     // remove mouse move call back
-                    controller._map.off('mousemove', controller._mousemoveCallback);
+                    document.removeEventListener('mousemove', controller._mousemoveCallback);
+                    document.removeEventListener('mouseup', controller._mouseupCallback);
+                    controller.finish(controller.mousePos(e))
+                }
+            }
+
+            mousePos(e) {
+                const rect = this._canvas.getBoundingClientRect();
+                return new mapboxgl.Point(
+                    e.clientX - rect.left - this._canvas.clientLeft,
+                    e.clientY - rect.top - this._canvas.clientTop
+                );
+            }
+
+            finish(p) {
+                // Remove these events now that finish has been called.
+                // document.removeEventListener('mousemove', onMouseMove);
+                // document.removeEventListener('mousemove', this._mousemoveCallback);
+                // document.removeEventListener('keydown', onKeyDown);
+                // document.removeEventListener('mouseup', onMouseUp);
+                if (this.boxSelect) {
+
+                    if (this._box) {
+                        this._box.parentNode.removeChild(this._box);
+                        this._box = null;
+                    }
+
+                    // call fog map to parse the box
+                } else {
+                    if (p) {
+                        const coordinate = this._map.unproject(p);
+                        // debugger;
+                        this.fogMap.addFogAt(coordinate.lng, coordinate.lat);
+                    }
                 }
             }
         }
