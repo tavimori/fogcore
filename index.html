@@ -6,7 +6,8 @@
     <title>Fork my world</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
 
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.js'></script>
+    <!-- <script src='https://api.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.js'></script> -->
+    <script src='mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.css' rel='stylesheet' />
 
     <script src="filedrop-min.js"></script>
@@ -119,7 +120,8 @@
 
             get region() {
                 let regionChar0 = String.fromCharCode((this.extraData[0] >> 3) + "?".charCodeAt(0));
-                let regionChar1 = String.fromCharCode((((this.extraData[0] & 0x7) << 2) | ((this.extraData[1] & 0xC0) >> 6)) + "?".charCodeAt(0));
+                let regionChar1 = String.fromCharCode((((this.extraData[0] & 0x7) << 2) | ((this.extraData[1] &
+                    0xC0) >> 6)) + "?".charCodeAt(0));
                 return regionChar0 + regionChar1;
             }
 
@@ -187,21 +189,36 @@
                 console.log("fog set!")
             }
 
+            addFogRect(xp0, yp0, xp1, yp1) {
+                const xMinInt = Math.floor(xp0 * BITMAP_WIDTH);
+                const xMaxInt = Math.ceil(xp1 * BITMAP_WIDTH) - 1;
+
+                const yMinInt = Math.floor(yp0 * BITMAP_WIDTH);
+                const yMaxInt = Math.ceil(yp1 * BITMAP_WIDTH) - 1;
+
+                for (let x = xMinInt; x <= xMaxInt; x++) {
+                    for (let y = yMinInt; y <= yMaxInt; y++) {
+                        this.set_visited(x, y, 0);
+                    }
+                }
+                console.log("fog set!")
+            }
+
 
             render() {
                 this.renderEnabled = true;
                 let zoom = this.parentTile.zoom;
 
-                // https://github.com/mapbox/mapbox-gl-js/issues/9873              
-                if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
-                    // console.log("render for first time!")
-                    if (zoom == 1) {
-                        zoom = 3;
-                    } else {
-                        zoom = zoom + 1;
-                    }
-                    this.renderForFirstTime = false;
-                }
+                // // https://github.com/mapbox/mapbox-gl-js/issues/9873              
+                // if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
+                //     // console.log("render for first time!")
+                //     if (zoom == 1) {
+                //         zoom = 3;
+                //     } else {
+                //         zoom = zoom + 1;
+                //     }
+                //     this.renderForFirstTime = false;
+                // }
 
                 const canvas = this.canvas;
 
@@ -320,7 +337,7 @@
 
             clearCanvas() {
                 const canvas = this.canvas;
-                const size = 3;
+                const size = 1;
                 canvas.width = size;
                 canvas.height = size;
                 const ctx = this.canvas.getContext("2d");
@@ -341,15 +358,15 @@
 
                 let zoom = this.zoom;
                 // https://github.com/mapbox/mapbox-gl-js/issues/9873              
-                if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
-                    // console.log("render for first time!")
-                    if (zoom == 1) {
-                        zoom = 3;
-                    } else {
-                        zoom = zoom + 1;
-                    }
-                    this.renderForFirstTime = false;
-                }
+                // if (((zoom & (zoom - 1)) == 0) && this.renderForFirstTime) {
+                //     // console.log("render for first time!")
+                //     if (zoom == 1) {
+                //         zoom = 3;
+                //     } else {
+                //         zoom = zoom + 1;
+                //     }
+                //     this.renderForFirstTime = false;
+                // }
 
                 const canvas = this.canvas;
 
@@ -447,12 +464,15 @@
                 const xMaxInt = Math.ceil(Math.min(this.parentFogMap.xMax - this.x, 1) * TILE_WIDTH) - 1;
                 const yMinInt = Math.floor(Math.max(this.parentFogMap.yMin - this.y, 0) * TILE_WIDTH);
                 const yMaxInt = Math.ceil(Math.min(this.parentFogMap.yMax - this.y, 1) * TILE_WIDTH) - 1;
-                return Object.values(this.blocks).filter(block => (block.x >= xMinInt) && (block.x <= xMaxInt) && (block.y >= yMinInt) && (block.y <= yMaxInt));
+                return Object.values(this.blocks).filter(block => (block.x >= xMinInt) && (block.x <= xMaxInt) && (
+                    block.y >= yMinInt) && (block.y <= yMaxInt));
             }
 
             addFogAt(xp, yp) {
-                const x = xp * TILE_WIDTH, y = yp * TILE_WIDTH
-                const blockX = Math.floor(x), blockY = Math.floor(y);
+                const x = xp * TILE_WIDTH,
+                    y = yp * TILE_WIDTH
+                const blockX = Math.floor(x),
+                    blockY = Math.floor(y);
                 if (this.blocks[[blockX, blockY]]) {
                     this.blocks[[blockX, blockY]].addFogAt(x - blockX, y - blockY);
                     this.render();
@@ -461,9 +481,49 @@
                 }
             }
 
+
+            addFogRect(xp0, yp0, xp1, yp1) {
+                console.log(`add fog at tile [${this.id}]  ${xp0}-${xp1}, ${yp0}-${yp1}`);
+
+
+                // const xMinInt = Math.floor(xp0 * BITMAP_WIDTH);
+                // const xMaxInt = Math.ceil(xp1 * BITMAP_WIDTH) - 1;
+
+                // const yMinInt = Math.floor(yp0 * BITMAP_WIDTH);
+                // const yMaxInt = Math.ceil(yp1 * BITMAP_WIDTH) - 1;
+
+
+                const xMin = xp0 * TILE_WIDTH;
+                const xMax = xp1 * TILE_WIDTH;
+                const yMin = yp0 * TILE_WIDTH
+                const yMax = yp1 * TILE_WIDTH;
+
+                const xMinInt = Math.floor(xMin);
+                const xMaxInt = Math.ceil(xMax) - 1;
+
+                const yMinInt = Math.floor(yMin);
+                const yMaxInt = Math.ceil(yMax) - 1;
+
+                Object.values(this.blocks)
+                    .filter(block => (block.x >= xMinInt) && (block.x <= xMaxInt) && (block.y >= yMinInt) && (block.y <=
+                        yMaxInt))
+                    .forEach(block => {
+                        const xp0 = Math.max(xMin - block.x, 0);
+                        const yp0 = Math.max(yMin - block.y, 0);
+                        const xp1 = Math.min(xMax - block.x, 1);
+                        const yp1 = Math.min(yMax - block.y, 1);
+                        block.addFogRect(xp0, yp0, xp1, yp1);
+                    });
+
+                this.render();
+
+
+            }
+
             get_block_bounds(block_x, block_y) {
                 let sw = tile_x_y_to_lng_lat(this.x + block_x / TILE_WIDTH, this.y + (block_y + 1) / TILE_WIDTH);
-                let se = tile_x_y_to_lng_lat(this.x + (block_x + 1) / TILE_WIDTH, this.y + (block_y + 1) / TILE_WIDTH);
+                let se = tile_x_y_to_lng_lat(this.x + (block_x + 1) / TILE_WIDTH, this.y + (block_y + 1) /
+                    TILE_WIDTH);
                 let ne = tile_x_y_to_lng_lat(this.x + (block_x + 1) / TILE_WIDTH, this.y + block_y / TILE_WIDTH);
                 let nw = tile_x_y_to_lng_lat(this.x + block_x / TILE_WIDTH, this.y + block_y / TILE_WIDTH);
                 return [nw, ne, se, sw];
@@ -532,7 +592,8 @@
                 var yMaxInt = Math.ceil(this.yMax) - 1;
 
                 // FIXME: lng cross 0
-                var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMinInt) && (tile.x <= xMaxInt) && (tile.y >= yMinInt) && (tile.y <= yMaxInt));
+                var activeTiles = Object.values(this.tiles).filter(tile => (tile.x >= xMinInt) && (tile.x <=
+                    xMaxInt) && (tile.y >= yMinInt) && (tile.y <= yMaxInt));
 
 
                 // var mapZoom = this.map.getZoom();
@@ -574,14 +635,44 @@
 
             addFogAt(lng, lat) {
                 const coord = tile_lng_lat_to_x_y(lng, lat)
-                const x = coord[0], y = coord[1];
+                const x = coord[0],
+                    y = coord[1];
                 // add fog only if the fog already be cleaned
-                const tileX = Math.floor(x), tileY = Math.floor(y);
+                const tileX = Math.floor(x),
+                    tileY = Math.floor(y);
                 if (this.tiles[[tileX, tileY]]) {
                     this.tiles[[tileX, tileY]].addFogAt(x - tileX, y - tileY);
                 } else {
                     console.log("tile not exists");
                 }
+            }
+
+            addFogRect(lng0, lat0, lng1, lat1) {
+                const coord0 = tile_lng_lat_to_x_y(lng0, lat0);
+                const coord1 = tile_lng_lat_to_x_y(lng1, lat1);
+
+                // FIXME: what if lng=0
+                const xMin = Math.min(coord0[0], coord1[0]);
+                const xMax = Math.max(coord0[0], coord1[0]);
+                const yMin = Math.min(coord0[1], coord1[1]);
+                const yMax = Math.max(coord0[1], coord1[1]);
+
+                const xMinInt = Math.floor(xMin);
+                const xMaxInt = Math.ceil(xMax) - 1;
+
+                const yMinInt = Math.floor(yMin);
+                const yMaxInt = Math.ceil(yMax) - 1;
+
+                Object.values(this.tiles)
+                    .filter(tile => (tile.x >= xMinInt) && (tile.x <= xMaxInt) && (tile.y >= yMinInt) && (tile.y <=
+                        yMaxInt))
+                    .forEach(tile => {
+                        const xp0 = Math.max(xMin - tile.x, 0);
+                        const yp0 = Math.max(yMin - tile.y, 0);
+                        const xp1 = Math.min(xMax - tile.x, 1);
+                        const yp1 = Math.min(yMax - tile.y, 1);
+                        tile.addFogRect(xp0, yp0, xp1, yp1);
+                    });
             }
 
         }
@@ -659,7 +750,7 @@
                 // this._map.on('mousemove', () => {
                 //     this._map.getCanvas().style.cursor = ''
                 // })
-                this._canvas.removeEventListener('mousedown', this._mousedownCallback,true);
+                this._canvas.removeEventListener('mousedown', this._mousedownCallback, true);
             }
 
             // FIXME: mouse up should be listened globally?
@@ -753,8 +844,12 @@
                         this._box.parentNode.removeChild(this._box);
                         this._box = null;
                     }
-
-                    // call fog map to parse the box
+                    if (p) {
+                        const coordinate0 = this._map.unproject(this.start);
+                        const coordinate1 = this._map.unproject(p);
+                        // call fog map to parse the box
+                        this.fogMap.addFogRect(coordinate0.lng, coordinate0.lat, coordinate1.lng, coordinate1.lat);
+                    }
                 } else {
                     if (p) {
                         const coordinate = this._map.unproject(p);
@@ -767,7 +862,8 @@
 
 
 
-        mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY2ozeHh3NXdjMDAwYTJ3bnk2ZXhqbTkzbiJ9.BGLmrBqqXkZv50HKrwaZRQ';
+        mapboxgl.accessToken =
+            'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY2ozeHh3NXdjMDAwYTJ3bnk2ZXhqbTkzbiJ9.BGLmrBqqXkZv50HKrwaZRQ';
         var map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/streets-v11',
@@ -780,7 +876,9 @@
 
         // Add zoom and rotation controls to the map.
 
-        map.addControl(new mapboxgl.FullscreenControl({ container: document.querySelector('body') }));
+        map.addControl(new mapboxgl.FullscreenControl({
+            container: document.querySelector('body')
+        }));
         map.addControl(new mapboxgl.NavigationControl({
             visualizePitch: true
         }));
@@ -812,14 +910,18 @@
                         function (data) {
                             fogMap.addFile(file.name, data);
                         },
-                        function (e) { console.log(`cannot read ${file.name}`) }
+                        function (e) {
+                            console.log(`cannot read ${file.name}`)
+                        }
                     )
                 })
             })
 
             zone.event('upload', function (e) {
 
-                var error = function () { alert('Problem reading the file system.'); }
+                var error = function () {
+                    alert('Problem reading the file system.');
+                }
 
                 var done = function (files) {
                     // files is standard FileDrop's FileList object.
@@ -837,7 +939,9 @@
                                 function (data) {
                                     fogMap.addFile(file.name, data);
                                 },
-                                function (e) { console.log(`cannot read ${file.name}`) }
+                                function (e) {
+                                    console.log(`cannot read ${file.name}`)
+                                }
                             )
 
                         } else {
@@ -863,7 +967,6 @@
             });
 
         });
-
     </script>
 </body>
 
