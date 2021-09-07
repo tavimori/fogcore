@@ -116,6 +116,7 @@
 
                 this.renderEnabled = false;
                 this.renderForFirstTime = false;
+                this.canvas = document.createElement("canvas");
             }
 
             get region() {
@@ -155,15 +156,17 @@
             set renderEnabled(enabled) {
                 if (enabled) {
                     if (!this.canvas) {
-                        this.canvas = document.createElement("canvas");
+                        // this.canvas = document.createElement("canvas");
                         this.renderForFirstTime = true;
                     }
                     if (!this.map.getSource(this.name)) {
                         this.map.addSource(this.name, {
                             type: 'canvas',
                             canvas: this.canvas,
+                            animate: false,
                             coordinates: this.bounds
                         });
+                        // this.map.getSource(this.name).pause();
                     }
                     if (!this.map.getLayer(this.name)) {
                         this.map.addLayer({
@@ -178,7 +181,7 @@
                 } else {
                     if (this.map.getLayer(this.name)) this.map.removeLayer(this.name);
                     if (this.map.getSource(this.name)) this.map.removeSource(this.name);
-                    this.canvas = undefined;
+                    // this.canvas = undefined;
                 }
             }
 
@@ -253,6 +256,10 @@
                         }
                     }
                 }
+
+                // map.getSource(this.name).play();
+                // map.getSource(this.name).pause();
+                
                 // console.log(`block [${this.x}, ${this.y}] done`);
             }
         }
@@ -309,23 +316,28 @@
 
                 this.canvas = document.createElement("canvas");
 
-                this.render();
+                
 
                 // load tile to map
                 map.addSource(`tile${this.id}`, {
                     type: 'canvas',
                     canvas: this.canvas,
+                    animate: false,
                     coordinates: this.bounds()
                 });
+
+                // map.getSource(`tile${this.id}`).pause();
 
                 map.addLayer({
                     id: `tile${this.id}`,
                     type: 'raster',
                     source: `tile${this.id}`,
-                    // paint: {
-                    //     'raster-resampling': 'nearest'
-                    // }
+                    paint: {
+                        'raster-resampling': 'nearest'
+                    }
                 });
+
+                this.render();
             }
 
             renderBlockCanvas() {
@@ -431,7 +443,8 @@
                             }
                         }
                     }
-
+                    // map.getSource(`tile${this.id}`).play();
+                    // map.getSource(`tile${this.id}`).pause();
 
                 }
                 // console.log(`tile render finished ${this.id} size: ${size}`);
@@ -516,6 +529,8 @@
                     });
 
                 this.render();
+
+                
 
 
             }
@@ -604,6 +619,7 @@
                     tile.render();
                 });
 
+                this.map.triggerRepaint();
 
                 // console.log(`x: [${this.xMin}, ${this.xMax}], y: [${this.yMin}, ${this.yMax}]`);
                 // console.log(activeTiles);
@@ -626,6 +642,8 @@
                     console.log(e)
                 }
 
+                this.optimizeView();
+
 
                 // map.flyTo({
                 //     center: tile.bounds()[0],
@@ -645,6 +663,8 @@
                 } else {
                     console.log("tile not exists");
                 }
+
+                this.map.triggerRepaint();
             }
 
             addFogRect(lng0, lat0, lng1, lat1) {
@@ -673,6 +693,8 @@
                         const yp1 = Math.min(yMax - tile.y, 1);
                         tile.addFogRect(xp0, yp0, xp1, yp1);
                     });
+                
+                this.map.triggerRepaint();
             }
 
         }
