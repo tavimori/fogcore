@@ -1,4 +1,5 @@
-mod fogmaps;
+pub mod fogmaps;
+pub mod renderer;
 mod utils;
 
 use wasm_bindgen::prelude::*;
