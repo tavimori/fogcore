@@ -1,23 +1,42 @@
 use crate::fogmaps::{Block, Tile};
 use crate::fogmaps::{BITMAP_WIDTH, BITMAP_WIDTH_OFFSET, TILE_WIDTH_OFFSET};
 use crate::FogMap;
-use tiny_skia::{Color, Paint, Pixmap, Rect, Transform};
+use tiny_skia;
 
 const FOW_TILE_ZOOM: i16 = 9;
-const FOW_BLOCK_ZOOM: i16 = FOW_TILE_ZOOM + TILE_WIDTH_OFFSET;
-const CANVAS_SIZE_OFFSET: i16 = 9;
-// const CANVAS_SIZE: u16 = 1 << CANVAS_SIZE_OFFSET;
+const DEFAULT_VIEW_SIZE_POWER: i16 = 8; // default view size is 2^8 = 256
 
+// we have 512*512 tiles, 128*128 blocks and a single block contains a 64*64 bitmap.
 pub struct FogRenderer {
-    canvas_size_order: u16,
+    view_size_power: i16,
+    bg_color_prgba: tiny_skia::PremultipliedColorU8,
+    fg_color_prgba: tiny_skia::PremultipliedColorU8,
 }
 
 impl FogRenderer {
     /// Create a FogRenderer.
     pub fn new() -> Self {
+        let opacity = 0.5;
+        let alpha = (opacity * 255.0) as u8;
+        let bg_color_prgba = tiny_skia::PremultipliedColorU8::from_rgba(0, 0, 0, alpha).unwrap();
+        let fg_color_prgba = tiny_skia::PremultipliedColorU8::TRANSPARENT;
         Self {
-            canvas_size_order: 9,
+            view_size_power: DEFAULT_VIEW_SIZE_POWER,
+            bg_color_prgba,
+            fg_color_prgba,
         }
+    }
+
+    pub fn set_fg_color(&mut self, color: tiny_skia::Color) {
+        self.fg_color_prgba = color.to_color_u8().premultiply();
+    }
+
+    pub fn set_bg_color(&mut self, color: tiny_skia::Color) {
+        self.bg_color_prgba = color.to_color_u8().premultiply();
+    }
+
+    pub fn set_tile_size_power(&mut self, power: i16) {
+        self.view_size_power = power;
     }
 
     /// Render a given location of FogMap data onto a Pixmap.
@@ -27,176 +46,232 @@ impl FogRenderer {
     /// * `tile_y`: y-index of a tile, provided the zoom level.
     /// * `zoom`: zoom levels. Please refer to [OSM zoom levels](https://wiki.openstreetmap.org/wiki/Zoom_levels) for more infomation.
     /// * `width`: width of an image in pixels.
+    // TODO: may use mipmap to accelerate the rendering.
+    // TODO: currently if a pixel contains multiple tile / block, the rendering process will write over the pixel multiple times, may use other interpolation method.
+    // We use a method called max-pooling interpolation to enlarge the tracks while keeping them easy to see at different sizes.
     pub fn render_pixmap(
         &self,
         fogmap: &FogMap,
-        tile_x: u64,
-        tile_y: u64,
+        view_x: u64,
+        view_y: u64,
         zoom: i16,
-        canvas_size_order: i16,
-    ) -> Pixmap {
-        let width = 1 << canvas_size_order;
-        let mut pixmap = Pixmap::new(width, width).unwrap();
+    ) -> tiny_skia::Pixmap {
+        let width = 1 << self.view_size_power;
+        let mut pixmap = tiny_skia::Pixmap::new(width, width).unwrap();
+        let pixels = pixmap.pixels_mut();
 
-        // TODO: if zero?
+        // draw background
+        for p in pixels.iter_mut() {
+            *p = self.bg_color_prgba;
+        }
 
-        let mut paint = Paint::default();
-        paint.set_color(Color::TRANSPARENT);
+        // https://developers.google.com/maps/documentation/javascript/coordinates
+        let zoom_diff_view_to_tile = zoom - FOW_TILE_ZOOM;
 
-        if zoom <= FOW_TILE_ZOOM {
-            // the drawing tile is larger than or equal to a fogmap tile, render multiple fogmap tiles.
-
-            let canvas_num_fow_tile_offset = FOW_TILE_ZOOM - zoom;
-            let fm_tile_x_min = tile_x << canvas_num_fow_tile_offset;
-            let fm_tile_x_max = (tile_x + 1) << canvas_num_fow_tile_offset;
-            let fm_tile_y_min = tile_y << canvas_num_fow_tile_offset;
-            let fm_tile_y_max = (tile_y + 1) << canvas_num_fow_tile_offset;
-
-            for fm_tile_x in fm_tile_x_min..fm_tile_x_max {
-                for fm_tile_y in fm_tile_y_min..fm_tile_y_max {
-                    if let Some(tile) = fogmap.get_tile(fm_tile_x, fm_tile_y) {
-                        let canvas_fow_tile_size_offset =
-                            canvas_size_order - canvas_num_fow_tile_offset;
-                        Self::render_tile_on_pixmap(
-                            tile,
-                            &mut pixmap,
-                            (fm_tile_x - fm_tile_x_min) << canvas_fow_tile_size_offset,
-                            (fm_tile_y - fm_tile_y_min) << canvas_fow_tile_size_offset,
-                            canvas_fow_tile_size_offset,
-                        );
-                    }
-                }
-            }
+        // when view has larger zoom, the view_x is larger than tile_x (but the region of view is smaller)
+        let (tile_x, tile_y) = if zoom_diff_view_to_tile > 0 {
+            (
+                view_x >> zoom_diff_view_to_tile,
+                view_y >> zoom_diff_view_to_tile,
+            )
         } else {
-            // the drawing tile is smaller than a fogmap tile.
-            let tile_over_offset = zoom - FOW_TILE_ZOOM;
-            let fow_tile_x = tile_x >> tile_over_offset;
-            let fow_tile_y = tile_y >> tile_over_offset;
-            let sub_tile_mask = (1 << tile_over_offset) - 1;
+            (
+                view_x << -zoom_diff_view_to_tile,
+                view_y << -zoom_diff_view_to_tile,
+            )
+        };
 
-            let canvas_num_fow_block_offset = TILE_WIDTH_OFFSET - tile_over_offset;
+        // when zoom_diff_view_to_tile < 0, a view contains multiple tiles.
+        for i in 0..(1 << std::cmp::max(-zoom_diff_view_to_tile, 0)) {
+            for j in 0..(1 << std::cmp::max(-zoom_diff_view_to_tile, 0)) {
+                // draw tile tile_x+i, tile_y+j
 
-            if zoom > FOW_BLOCK_ZOOM {
-                // sub-block rendering
-                let fow_block_x = (tile_x & sub_tile_mask) >> -canvas_num_fow_block_offset;
-                let fow_block_y = (tile_y & sub_tile_mask) >> -canvas_num_fow_block_offset;
-                let sub_block_mask = (1 << (tile_over_offset - TILE_WIDTH_OFFSET)) - 1;
+                if let Some(tile) = fogmap.tiles.get(&(tile_x + i, tile_y + j)) {
+                    // if zoom_diff_view_to_tile > 0, view zoom larger, view region smaller, draw a portion of a single tile.
+                    // if zoom_diff_view_to_tile < 0, view zoom smaller, view region larger, draw the full tile at given location of view.
 
-                let canvas_num_fow_pixel_offset = canvas_num_fow_block_offset + BITMAP_WIDTH_OFFSET;
+                    // tile_width in pixels
+                    let zoom_factor = std::cmp::max(0, zoom_diff_view_to_tile);
+                    let (sub_tile_x_idx, sub_tile_y_idx) = if zoom_factor > 0 {
+                        let mask = (1 << zoom_factor) - 1;
+                        ((view_x) & mask, (view_y) & mask)
+                    } else {
+                        (0, 0)
+                    };
 
-                let fm_block_pixel_x_min = (tile_x & sub_block_mask) << canvas_num_fow_pixel_offset;
-                let fm_block_pixel_x_max =
-                    ((tile_x & sub_block_mask) + 1) << canvas_num_fow_pixel_offset;
-                let fm_block_pixel_y_min = (tile_y & sub_block_mask) << canvas_num_fow_pixel_offset;
-                let fm_block_pixel_y_max =
-                    ((tile_y & sub_block_mask) + 1) << canvas_num_fow_pixel_offset;
+                    let tile_width_power = zoom_diff_view_to_tile + self.view_size_power;
 
-                if let Some(tile) = fogmap.tiles.get(&(fow_tile_x, fow_tile_y)) {
-                    if let Some(block) = tile.blocks().get(&(fow_block_x, fow_block_y)) {
-                        for fm_pix_x in fm_block_pixel_x_min..fm_block_pixel_x_max {
-                            for fm_pix_y in fm_block_pixel_y_min..fm_block_pixel_y_max {
-                                let canvas_fow_pixel_size_offset =
-                                    CANVAS_SIZE_OFFSET - canvas_num_fow_pixel_offset;
-                                if block.is_visited(fm_pix_x, fm_pix_y) {
-                                    let x = (fm_pix_x - fm_block_pixel_x_min)
-                                        << canvas_fow_pixel_size_offset;
-                                    let y = (fm_pix_y - fm_block_pixel_y_min)
-                                        << canvas_fow_pixel_size_offset;
-
-                                    pixmap.fill_rect(
-                                        Rect::from_xywh(
-                                            x as f32,
-                                            y as f32,
-                                            (1 << canvas_fow_pixel_size_offset) as f32,
-                                            (1 << canvas_fow_pixel_size_offset) as f32,
-                                        )
-                                        .unwrap(),
-                                        &paint,
-                                        Transform::identity(),
-                                        None,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // sub-tile rendering
-                let fow_block_x_min = (tile_x & sub_tile_mask) << canvas_num_fow_block_offset;
-                let fow_block_x_max = ((tile_x & sub_tile_mask) + 1) << canvas_num_fow_block_offset;
-                let fow_block_y_min = (tile_y & sub_tile_mask) << canvas_num_fow_block_offset;
-                let fow_block_y_max = ((tile_y & sub_tile_mask) + 1) << canvas_num_fow_block_offset;
-
-                let canvas_fow_block_size_offset = CANVAS_SIZE_OFFSET - canvas_num_fow_block_offset;
-
-                if let Some(tile) = fogmap.tiles.get(&(fow_tile_x, fow_tile_y)) {
-                    for (key, block) in tile.blocks().iter() {
-                        let (block_x, block_y) = *key;
-                        if block_x >= fow_block_x_min
-                            && block_x < fow_block_x_max
-                            && block_y >= fow_block_y_min
-                            && block_y < fow_block_y_max
-                        {
-                            let dx = (block_x - fow_block_x_min) << canvas_fow_block_size_offset;
-                            let dy = (block_y - fow_block_y_min) << canvas_fow_block_size_offset;
-                            Self::render_block_on_pixmap(
-                                block,
-                                &mut pixmap,
-                                dx,
-                                dy,
-                                canvas_fow_block_size_offset,
-                            );
-                        }
-                    }
+                    // tile shift for the (i,j)th tile in this view
+                    let (x0, y0) = if tile_width_power > 0 {
+                        (i << tile_width_power, j << tile_width_power)
+                    } else {
+                        (i >> -tile_width_power, j >> -tile_width_power)
+                    };
+                    self.render_tile_on_pixels(
+                        tile,
+                        pixels,
+                        x0,
+                        y0,
+                        sub_tile_x_idx,
+                        sub_tile_y_idx,
+                        zoom_factor,
+                        std::cmp::min(tile_width_power, self.view_size_power),
+                    );
                 }
             }
         }
-
         pixmap
     }
 
-    fn render_tile_on_pixmap(tile: &Tile, pixmap: &mut Pixmap, dx: u64, dy: u64, zoom: i16) {
-        let overscan_offset = zoom - TILE_WIDTH_OFFSET;
-        for (key, block) in tile.blocks().iter() {
-            let (x, y) = key;
-            let block_dx = dx + (*x as u64) << overscan_offset;
-            let block_dy = dy + (*y as u64) << overscan_offset;
-            Self::render_block_on_pixmap(block, pixmap, block_dx, block_dy, overscan_offset);
-        }
-    }
+    fn render_tile_on_pixels(
+        &self,
+        tile: &Tile,
+        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        start_x: u64,
+        start_y: u64,
+        sub_tile_x_idx: u64,
+        sub_tile_y_idx: u64,
+        zoom_factor: i16,
+        size_power: i16,
+    ) {
+        debug_assert!(
+            zoom_factor >= 0,
+            "tile zoom factor must be greater or equal to zero"
+        );
+        debug_assert!(
+            sub_tile_x_idx <= 1 << zoom_factor,
+            "sub_tile_x_idx cannot exceed the tile"
+        );
+        debug_assert!(
+            sub_tile_y_idx <= 1 << zoom_factor,
+            "sub_tile_y_idx cannot exceed the tile"
+        );
 
-    fn render_block_on_pixmap(block: &Block, pixmap: &mut Pixmap, dx: u64, dy: u64, zoom: i16) {
-        let mut paint = Paint::default();
-        paint.set_color(Color::TRANSPARENT);
-
-        if zoom <= 0 {
-            pixmap.fill_rect(
-                Rect::from_xywh(dx as f32, dy as f32, 1.0, 1.0).unwrap(),
-                &paint,
-                Transform::identity(),
-                None,
-            );
+        if size_power <= 0 {
+            // the tile only occupies at most one pixel, so we don't have to access the blocks.
+            self.draw_pixel(pixels, start_x, start_y);
         } else {
-            let overscan_offset = zoom - BITMAP_WIDTH_OFFSET;
+            // the tile occupies more than one pixel, currently all the blocks will be used to render。
 
-            for x in 0..BITMAP_WIDTH {
-                for y in 0..BITMAP_WIDTH {
-                    if block.is_visited(x, y) {
-                        // for each pixel of block, we may draw multiple pixel of image
-                        pixmap.fill_rect(
-                            Rect::from_xywh(
-                                (dx + (x as u64) << overscan_offset) as f32,
-                                (dy + (y as u64) << overscan_offset) as f32,
-                                (1 << std::cmp::max(overscan_offset, 0)) as f32,
-                                (1 << std::cmp::max(overscan_offset, 0)) as f32,
-                            )
-                            .unwrap(),
-                            &paint,
-                            Transform::identity(),
-                            None,
+            let block_num_power = TILE_WIDTH_OFFSET - zoom_factor; // number of block in a row of the view
+            let (block_start_x, block_start_y) = if block_num_power >= 0 {
+                (
+                    sub_tile_x_idx << block_num_power,
+                    sub_tile_y_idx << block_num_power,
+                )
+            } else {
+                (
+                    sub_tile_x_idx >> -block_num_power,
+                    sub_tile_y_idx >> -block_num_power,
+                )
+            };
+
+            let block_zoom_factor = std::cmp::max(0, -block_num_power);
+            let (sub_block_x_idx, sub_block_y_idx) = if block_zoom_factor > 0 {
+                let mask = (1 << block_zoom_factor) - 1;
+                ((sub_tile_x_idx) & mask, (sub_tile_y_idx) & mask)
+            } else {
+                (0, 0)
+            };
+            let block_width_power = size_power - block_num_power;
+
+            for i in 0..(1 << std::cmp::max(block_num_power, 0)) {
+                for j in 0..(1 << std::cmp::max(block_num_power, 0)) {
+                    if let Some(block) = tile.blocks().get(&(block_start_x + i, block_start_y + j))
+                    {
+                        let (offset_x, offset_y) = if block_width_power >= 0 {
+                            (i << block_width_power, j << block_width_power)
+                        } else {
+                            (i >> -block_width_power, j >> -block_width_power)
+                        };
+                        self.render_block_on_pixels(
+                            block,
+                            pixels,
+                            start_x + offset_x,
+                            start_y + offset_y,
+                            sub_block_x_idx,
+                            sub_block_y_idx,
+                            block_zoom_factor,
+                            std::cmp::min(block_width_power, self.view_size_power),
                         );
                     }
                 }
+            }
+        }
+    }
+
+    fn render_block_on_pixels(
+        &self,
+        block: &Block,
+        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        start_x: u64,
+        start_y: u64,
+        sub_block_x_idx: u64,
+        sub_block_y_idx: u64,
+        zoom_factor: i16,
+        size_power: i16,
+    ) {
+        if size_power <= 0 {
+            self.draw_pixel(pixels, start_x, start_y);
+        } else {
+            let dot_num_power = BITMAP_WIDTH_OFFSET - zoom_factor; // number of block in a row of the view
+
+            let (dot_start_x, dot_start_y) = if dot_num_power >= 0 {
+                (
+                    sub_block_x_idx << dot_num_power,
+                    sub_block_y_idx << dot_num_power,
+                )
+            } else {
+                (
+                    sub_block_x_idx >> -dot_num_power,
+                    sub_block_y_idx >> -dot_num_power,
+                )
+            };
+
+            let block_dot_width_power = size_power - (BITMAP_WIDTH_OFFSET - zoom_factor);
+            let block_dot_width = 1 << std::cmp::max(0, block_dot_width_power);
+
+            for i in 0..(1 << std::cmp::max(dot_num_power, 0)) {
+                for j in 0..(1 << std::cmp::max(dot_num_power, 0)) {
+                    let (dot_x, dot_y) = (dot_start_x + i, dot_start_y + j);
+                    if block.is_visited(dot_x, dot_y) {
+                        debug_assert!(dot_x < BITMAP_WIDTH);
+                        debug_assert!(dot_y < BITMAP_WIDTH);
+                        let (offset_x, offset_y) = if block_dot_width_power >= 0 {
+                            (i << block_dot_width_power, j << block_dot_width_power)
+                        } else {
+                            (i >> -block_dot_width_power, j >> -block_dot_width_power)
+                        };
+                        self.draw_rect(
+                            pixels,
+                            start_x + offset_x,
+                            start_y + offset_y,
+                            block_dot_width,
+                            block_dot_width,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_pixel(&self, pixels: &mut [tiny_skia::PremultipliedColorU8], x: u64, y: u64) {
+        // according to tiny-skia docs, the pixel data is not aligned, therefore pixels can be accessed dirrecly by `pixels[x*width + y]`
+        let index = x + (y << self.view_size_power);
+        pixels[index as usize] = self.fg_color_prgba;
+    }
+
+    fn draw_rect(
+        &self,
+        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        x: u64,
+        y: u64,
+        w: u64,
+        h: u64,
+    ) {
+        for i in x..(x + w) {
+            for j in y..(y + h) {
+                self.draw_pixel(pixels, i, j);
             }
         }
     }
