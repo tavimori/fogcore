@@ -53,7 +53,7 @@ impl FogMap {
 
         println!("parsing tile x:{} y:{}", x, y);
 
-        let tile = self.tiles.entry((x, y)).or_insert(Tile::new(x, y));
+        let tile = self.tiles.entry((x, y)).or_insert(Tile::new());
 
         let data_inflate = decompress_to_vec_zlib(&data).unwrap();
 
@@ -70,7 +70,7 @@ impl FogMap {
                 let start_offset = TILE_HEADER_SIZE + ((block_idx - 1) as usize) * BLOCK_SIZE;
                 let end_offset = start_offset + BLOCK_SIZE;
                 let data = data_inflate[start_offset..end_offset].to_vec();
-                let block = Block::new_with_data(block_x, block_y, data);
+                let block = Block::new_with_data(data);
                 println!("inserting block {}-{}", block_x, block_y);
                 tile.add_by_blocks(block_x, block_y, block)
             }
@@ -86,18 +86,12 @@ impl FogMap {
 }
 
 pub struct Tile {
-    // file_name: String,
-    // id: u32,
-    x: u64,
-    y: u64,
     blocks: HashMap<(u64, u64), Block>,
 }
 
 impl Tile {
-    pub fn new(x: u64, y: u64) -> Self {
+    pub fn new() -> Self {
         Self {
-            x,
-            y,
             blocks: HashMap::new(),
         }
     }
@@ -108,73 +102,18 @@ impl Tile {
         self.blocks.insert((x, y), block);
     }
 
-    // deprecated
-    pub fn create(file_name: &str, data: Vec<u8>) -> Self {
-        let mut filename_encoding = std::collections::HashMap::new();
-        for (i, char) in FILENAME_MASK1.chars().enumerate() {
-            filename_encoding.insert(char, i);
-        }
-        // TODO: apply some checks here
-        let id = file_name[4..file_name.len() - 2]
-            .chars()
-            .map(|id_masked| filename_encoding[&id_masked].to_string())
-            .collect::<String>()
-            .parse::<u64>()
-            .unwrap();
-
-        let x = id % MAP_WIDTH;
-        let y = id / MAP_WIDTH;
-
-        println!("parsing tile x:{} y:{}", x, y);
-
-        let data_inflate = decompress_to_vec_zlib(&data).unwrap();
-
-        println!("inflated data len: {}", data_inflate.len());
-
-        let header = &data_inflate[0..TILE_HEADER_SIZE];
-
-        let mut blocks = HashMap::new();
-
-        for i in 0..TILE_HEADER_LEN {
-            // parse two u8 as a single u16 according to little endian
-            let block_idx: u16 = (header[i * 2] as u16) | ((header[i * 2 + 1] as u16) << 8);
-            if block_idx > 0 {
-                let block_x: u64 = (i % TILE_WIDTH).try_into().unwrap();
-                let block_y: u64 = (i / TILE_WIDTH).try_into().unwrap();
-                let start_offset = TILE_HEADER_SIZE + ((block_idx - 1) as usize) * BLOCK_SIZE;
-                let end_offset = start_offset + BLOCK_SIZE;
-                let data = data_inflate[start_offset..end_offset].to_vec();
-                let block = Block::new_with_data(block_x, block_y, data);
-                println!("inserting block {}-{}", block_x, block_y);
-                blocks.insert((block_x, block_y), block);
-            }
-        }
-
-        println!("inflated data len: {:?}", data_inflate.len());
-
-        Self {
-            // file_name: file_name.to_string(),
-            // id,
-            x,
-            y,
-            blocks,
-        }
-    }
-
     pub fn blocks(&self) -> &HashMap<(u64, u64), Block> {
         &self.blocks
     }
 }
 
 pub struct Block {
-    x: u64,
-    y: u64,
     data: Vec<u8>,
 }
 
 impl Block {
-    pub fn new_with_data(x: u64, y: u64, data: Vec<u8>) -> Self {
-        Self { x, y, data }
+    pub fn new_with_data(data: Vec<u8>) -> Self {
+        Self { data }
     }
 
     pub fn is_visited(&self, x: u64, y: u64) -> bool {
