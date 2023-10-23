@@ -52,8 +52,8 @@ impl FogRenderer {
     pub fn render_pixmap(
         &self,
         fogmap: &FogMap,
-        view_x: u64,
-        view_y: u64,
+        view_x: i64,
+        view_y: i64,
         zoom: i16,
     ) -> tiny_skia::Pixmap {
         let width = 1 << self.view_size_power;
@@ -127,10 +127,10 @@ impl FogRenderer {
         &self,
         tile: &Tile,
         pixels: &mut [tiny_skia::PremultipliedColorU8],
-        start_x: u64,
-        start_y: u64,
-        sub_tile_x_idx: u64,
-        sub_tile_y_idx: u64,
+        start_x: i64,
+        start_y: i64,
+        sub_tile_x_idx: i64,
+        sub_tile_y_idx: i64,
         zoom_factor: i16,
         size_power: i16,
     ) {
@@ -204,10 +204,10 @@ impl FogRenderer {
         &self,
         block: &Block,
         pixels: &mut [tiny_skia::PremultipliedColorU8],
-        start_x: u64,
-        start_y: u64,
-        sub_block_x_idx: u64,
-        sub_block_y_idx: u64,
+        start_x: i64,
+        start_y: i64,
+        sub_block_x_idx: i64,
+        sub_block_y_idx: i64,
         zoom_factor: i16,
         size_power: i16,
     ) {
@@ -255,7 +255,7 @@ impl FogRenderer {
         }
     }
 
-    fn draw_pixel(&self, pixels: &mut [tiny_skia::PremultipliedColorU8], x: u64, y: u64) {
+    fn draw_pixel(&self, pixels: &mut [tiny_skia::PremultipliedColorU8], x: i64, y: i64) {
         // according to tiny-skia docs, the pixel data is not aligned, therefore pixels can be accessed dirrecly by `pixels[x*width + y]`
         let index = x + (y << self.view_size_power);
         pixels[index as usize] = self.fg_color_prgba;
@@ -264,10 +264,10 @@ impl FogRenderer {
     fn draw_rect(
         &self,
         pixels: &mut [tiny_skia::PremultipliedColorU8],
-        x: u64,
-        y: u64,
-        w: u64,
-        h: u64,
+        x: i64,
+        y: i64,
+        w: i64,
+        h: i64,
     ) {
         for i in x..(x + w) {
             for j in y..(y + h) {

@@ -7,21 +7,21 @@ const FILENAME_MASK1: &str = "olhwjsktri";
 const FILENAME_MASK2: &str = "eizxdwknmo";
 
 const MAP_WIDTH_OFFSET: i16 = 9;
-const MAP_WIDTH: u64 = 1 << MAP_WIDTH_OFFSET;
+const MAP_WIDTH: i64 = 1 << MAP_WIDTH_OFFSET;
 pub const TILE_WIDTH_OFFSET: i16 = 7;
-const TILE_WIDTH: u64 = 1 << TILE_WIDTH_OFFSET;
-const TILE_HEADER_LEN: u64 = TILE_WIDTH * TILE_WIDTH;
+const TILE_WIDTH: i64 = 1 << TILE_WIDTH_OFFSET;
+const TILE_HEADER_LEN: i64 = TILE_WIDTH * TILE_WIDTH;
 const TILE_HEADER_SIZE: usize = (TILE_HEADER_LEN * 2) as usize;
 const BLOCK_BITMAP_SIZE: usize = 512;
 const BLOCK_EXTRA_DATA: usize = 3;
 const BLOCK_SIZE: usize = BLOCK_BITMAP_SIZE + BLOCK_EXTRA_DATA;
 pub const BITMAP_WIDTH_OFFSET: i16 = 6;
-pub const BITMAP_WIDTH: u64 = 1 << BITMAP_WIDTH_OFFSET;
+pub const BITMAP_WIDTH: i64 = 1 << BITMAP_WIDTH_OFFSET;
 const ALL_OFFSET: i16 = TILE_WIDTH_OFFSET + BITMAP_WIDTH_OFFSET;
 
 /// An in-memory efficient representation of a persons tracks on the Earth.
 pub struct FogMap {
-    pub tiles: HashMap<(u64, u64), Tile>,
+    pub tiles: HashMap<(i64, i64), Tile>,
 }
 
 impl FogMap {
@@ -47,7 +47,7 @@ impl FogMap {
             .chars()
             .map(|id_masked| filename_encoding[&id_masked].to_string())
             .collect::<String>()
-            .parse::<u64>()
+            .parse::<i64>()
             .unwrap();
 
         let x = id % MAP_WIDTH;
@@ -68,8 +68,8 @@ impl FogMap {
             let index = (i as usize) * 2;
             let block_idx: u16 = (header[index] as u16) | ((header[index + 1] as u16) << 8);
             if block_idx > 0 {
-                let block_x: u64 = (i % TILE_WIDTH).try_into().unwrap();
-                let block_y: u64 = (i / TILE_WIDTH).try_into().unwrap();
+                let block_x: i64 = (i % TILE_WIDTH);
+                let block_y: i64 = (i / TILE_WIDTH);
                 let start_offset = TILE_HEADER_SIZE + ((block_idx - 1) as usize) * BLOCK_SIZE;
                 let end_offset = start_offset + BLOCK_SIZE;
                 let data = data_inflate[start_offset..end_offset].to_vec();
@@ -82,17 +82,16 @@ impl FogMap {
         println!("inflated data len: {:?}", data_inflate.len());
     }
 
-    pub fn get_tile(&self, x: u64, y: u64) -> Option<&Tile> {
-        // TODO: make everything u64?
+    pub fn get_tile(&self, x: i64, y: i64) -> Option<&Tile> {
         self.tiles.get(&(x, y))
     }
 
     // Web Mercator projection
-    pub fn lng_lat_to_tile_x_y(lng: f64, lat: f64, zoom: i16) -> (u64, u64) {
+    pub fn lng_lat_to_tile_x_y(lng: f64, lat: f64, zoom: i16) -> (i64, i64) {
         let mul = (1 << zoom) as f64;
         let x = (lng + 180.0) / 360.0 * mul;
         let y = (PI - (lat * PI / 180.0).tan().asinh()) * mul / (2.0 * PI);
-        (x as u64, y as u64)
+        (x as i64, y as i64)
     }
 
     pub fn add_line(&mut self, start_lng: f64, start_lat: f64, end_lng: f64, end_lat: f64) {
@@ -172,7 +171,7 @@ impl FogMap {
 }
 
 pub struct Tile {
-    blocks: HashMap<(u64, u64), Block>,
+    blocks: HashMap<(i64, i64), Block>,
 }
 
 impl Tile {
@@ -182,27 +181,27 @@ impl Tile {
         }
     }
 
-    fn add_by_blocks(&mut self, x: u64, y: u64, block: Block) {
+    fn add_by_blocks(&mut self, x: i64, y: i64, block: Block) {
         // TODO: current implementation will replace the tile if exist, change it to additive editing.
         // TODO: rethink the data type and whether should use into()
         self.blocks.insert((x, y), block);
     }
 
-    pub fn blocks(&self) -> &HashMap<(u64, u64), Block> {
+    pub fn blocks(&self) -> &HashMap<(i64, i64), Block> {
         &self.blocks
     }
 
     fn add_line(
         &mut self,
-        x: u64,
-        y: u64,
-        e: u64,
+        x: i64,
+        y: i64,
+        e: i64,
         p: i64,
         dx0: i64,
         dy0: i64,
         xaxis: bool,
         quadrants13: bool,
-    ) -> (u64, u64, i64) {
+    ) -> (i64, i64, i64) {
         let mut p = p;
         let mut x = x;
         let mut y = y;
@@ -287,14 +286,14 @@ impl Block {
         Self { data }
     }
 
-    pub fn is_visited(&self, x: u64, y: u64) -> bool {
+    pub fn is_visited(&self, x: i64, y: i64) -> bool {
         let bit_offset = 7 - (x % 8);
         let i = (x / 8) as usize;
         let j = (y) as usize;
         (self.data[i + j * 8] & (1 << bit_offset)) != 0
     }
 
-    fn set_point(&mut self, x: u64, y: u64, val: bool) {
+    fn set_point(&mut self, x: i64, y: i64, val: bool) {
         let bit_offset = 7 - (x % 8);
         let i = (x / 8) as usize;
         let j = (y) as usize;
@@ -306,16 +305,15 @@ impl Block {
     // a modified Bresenham algorithm with initialized error from upper layer
     fn add_line(
         &mut self,
-        x: u64,
-        y: u64,
-        e: u64,
+        x: i64,
+        y: i64,
+        e: i64,
         p: i64,
         dx0: i64,
         dy0: i64,
         xaxis: bool,
         quadrants13: bool,
-    ) -> (u64, u64, i64) {
-        // console.log(`subblock draw: x:${x}, y:${y}, e:${e}`);
+    ) -> (i64, i64, i64) {
         // Draw the first pixel
         let mut p = p;
         let mut x = x;
@@ -370,5 +368,17 @@ impl Block {
             }
         }
         (x, y, p)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_add_line() {
+        let mut fogmap = FogMap::new();
+        fogmap.add_line(121.5157559, 31.29735617, 121.515725, 31.29731979);
     }
 }

@@ -5,11 +5,11 @@ use std::io::Read;
 use tiny_skia;
 
 // Web Mercator projection
-fn lng_lat_to_tile_x_y(lng: f64, lat: f64, zoom: i16) -> (u64, u64) {
+fn lng_lat_to_tile_x_y(lng: f64, lat: f64, zoom: i16) -> (i64, i64) {
     let mul = (1 << zoom) as f64;
     let x = (lng + 180.0) / 360.0 * mul;
     let y = (PI - (lat * PI / 180.0).tan().asinh()) * mul / (2.0 * PI);
-    (x as u64, y as u64)
+    (x as i64, y as i64)
 }
 
 fn main() {
