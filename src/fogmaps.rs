@@ -1,6 +1,5 @@
 use miniz_oxide::inflate::decompress_to_vec_zlib;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::f64::consts::PI;
 
 const FILENAME_MASK1: &str = "olhwjsktri";
@@ -68,8 +67,8 @@ impl FogMap {
             let index = (i as usize) * 2;
             let block_idx: u16 = (header[index] as u16) | ((header[index + 1] as u16) << 8);
             if block_idx > 0 {
-                let block_x: i64 = (i % TILE_WIDTH);
-                let block_y: i64 = (i / TILE_WIDTH);
+                let block_x: i64 = i % TILE_WIDTH;
+                let block_y: i64 = i / TILE_WIDTH;
                 let start_offset = TILE_HEADER_SIZE + ((block_idx - 1) as usize) * BLOCK_SIZE;
                 let end_offset = start_offset + BLOCK_SIZE;
                 let data = data_inflate[start_offset..end_offset].to_vec();
@@ -208,9 +207,9 @@ impl Tile {
         if xaxis {
             // Rasterize the line
             while x < e {
-                if (x >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
+                if x >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
                     || y >> BITMAP_WIDTH_OFFSET < 0
-                    || y >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH)
+                    || y >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
                 {
                     break;
                 }
@@ -239,9 +238,9 @@ impl Tile {
         } else {
             // Rasterize the line
             while y < e {
-                if (y >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
+                if y >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
                     || x >> BITMAP_WIDTH_OFFSET < 0
-                    || x >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH)
+                    || x >> BITMAP_WIDTH_OFFSET >= TILE_WIDTH
                 {
                     break;
                 }
@@ -335,7 +334,7 @@ impl Block {
                     p = p + 2 * (dy0 - dx0);
                 }
 
-                if (x >= BITMAP_WIDTH || y < 0 || y >= BITMAP_WIDTH) {
+                if x >= BITMAP_WIDTH || y < 0 || y >= BITMAP_WIDTH {
                     break;
                 }
                 // Draw pixel from line span at
@@ -359,7 +358,7 @@ impl Block {
                     p = p + 2 * (dx0 - dy0);
                 }
 
-                if (y >= BITMAP_WIDTH || x < 0 || x >= BITMAP_WIDTH) {
+                if y >= BITMAP_WIDTH || x < 0 || x >= BITMAP_WIDTH {
                     break;
                 }
                 // Draw pixel from line span at

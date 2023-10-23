@@ -1,4 +1,4 @@
-use fogcore::fogmaps::{FogMap, Tile};
+use fogcore::fogmaps::{FogMap};
 use std::fs::File;
 use std::io::Read;
 
