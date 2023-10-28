@@ -96,9 +96,17 @@ impl FogMap {
     pub fn add_line(&mut self, start_lng: f64, start_lat: f64, end_lng: f64, end_lat: f64) {
         println!("[{},{}] to [{},{}]", start_lng, start_lat, end_lng, end_lat);
 
-        let (x0, y0) =
+        let (mut x0, y0) =
             Self::lng_lat_to_tile_x_y(start_lng, start_lat, ALL_OFFSET + MAP_WIDTH_OFFSET);
-        let (x1, y1) = Self::lng_lat_to_tile_x_y(end_lng, end_lat, ALL_OFFSET + MAP_WIDTH_OFFSET);
+        let (mut x1, y1) =
+            Self::lng_lat_to_tile_x_y(end_lng, end_lat, ALL_OFFSET + MAP_WIDTH_OFFSET);
+
+        let (x_half, _) = Self::lng_lat_to_tile_x_y(0.0, 0.0, ALL_OFFSET + MAP_WIDTH_OFFSET);
+        if x1 - x0 > x_half {
+            x0 += 2 * x_half;
+        } else if x0 - x1 > x_half {
+            x1 += 2 * x_half;
+        }
 
         // Iterators, counters required by algorithm
         // Calculate line deltas
@@ -120,9 +128,12 @@ impl FogMap {
                 (x1, y1, x0)
             };
             while x < xe {
+                // tile_x is not rounded, it may exceed the antimeridian
                 let (tile_x, tile_y) = (x >> ALL_OFFSET, y >> ALL_OFFSET);
-                println!("accessing tile {}-{}", tile_x, tile_y);
-                let tile = self.tiles.entry((tile_x, tile_y)).or_insert(Tile::new());
+                let tile = self
+                    .tiles
+                    .entry((tile_x % MAP_WIDTH, tile_y))
+                    .or_insert(Tile::new());
                 (x, y, px) = tile.add_line(
                     x - (tile_x << ALL_OFFSET),
                     y - (tile_y << ALL_OFFSET),
@@ -135,7 +146,6 @@ impl FogMap {
                 );
                 x += tile_x << ALL_OFFSET;
                 y += tile_y << ALL_OFFSET;
-                println!("tile draw: tile_x: {}, tile_y: {}", tile_x, tile_y);
             }
         } else {
             // The line is Y-axis dominant
@@ -146,11 +156,13 @@ impl FogMap {
                 // Line is drawn top to bottom
                 (x1, y1, y0)
             };
-            println!("y {} ye {}", y, ye);
             while y < ye {
+                // tile_x is not rounded, it may exceed the antimeridian
                 let (tile_x, tile_y) = (x >> ALL_OFFSET, y >> ALL_OFFSET);
-                println!("accessing tile {}-{}", tile_x, tile_y);
-                let tile = self.tiles.entry((tile_x, tile_y)).or_insert(Tile::new());
+                let tile = self
+                    .tiles
+                    .entry((tile_x % MAP_WIDTH, tile_y))
+                    .or_insert(Tile::new());
                 (x, y, py) = tile.add_line(
                     x - (tile_x << ALL_OFFSET),
                     y - (tile_y << ALL_OFFSET),
@@ -163,7 +175,6 @@ impl FogMap {
                 );
                 x += tile_x << ALL_OFFSET;
                 y += tile_y << ALL_OFFSET;
-                println!("tile draw: tile_x: {}, tile_y: {}", tile_x, tile_y);
             }
         }
     }
@@ -313,6 +324,10 @@ impl Block {
         xaxis: bool,
         quadrants13: bool,
     ) -> (i64, i64, i64) {
+        // println!(
+        //     "subblock draw: x:{}, y:{}, e:{}, p:{}, dx0:{}, dy0:{}, xaxis:{}, quadrants13:{}",
+        //     x, y, e, p, dx0, dy0, xaxis, quadrants13
+        // );
         // Draw the first pixel
         let mut p = p;
         let mut x = x;

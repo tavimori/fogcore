@@ -28,18 +28,28 @@ fn main() {
     renderer.set_fg_color(tiny_skia::Color::WHITE);
 
     // pkx
-    let start_lng = 116.4233640802707;
-    let start_lat = 39.51154847952295;
+    let pkx_lng = 116.4233640802707;
+    let pkx_lat = 39.51154847952295;
 
     // sha
-    let end_lng = 121.34651031397549;
-    let end_lat = 31.202812552714104;
+    let sha_lng = 121.34651031397549;
+    let sha_lat = 31.202812552714104;
 
+    fogmap.add_line(pkx_lng, pkx_lat, sha_lng, sha_lat);
+
+    // Melbourne to Hawaii
+    let (start_lng, start_lat, end_lng, end_lat) =
+        (144.847737, 37.6721702, -160.3644029, 21.3186185);
     fogmap.add_line(start_lng, start_lat, end_lng, end_lat);
 
-    for zoom in 2..20 {
+    // Hawaii to Guan
+    let (start_lng, start_lat, end_lng, end_lat) =
+        (-160.3644029, 21.3186185, 121.4708788, 9.4963078);
+    fogmap.add_line(start_lng, start_lat, end_lng, end_lat);
+
+    for zoom in 0..20 {
         // https://developers.google.com/maps/documentation/javascript/coordinates
-        let (x, y) = lng_lat_to_tile_x_y(start_lng, start_lat, zoom);
+        let (x, y) = lng_lat_to_tile_x_y(sha_lng, sha_lat, zoom);
 
         println!("draw x: {}, y: {}, zoom: {}", x, y, zoom);
         let pixmap = renderer.render_pixmap(&fogmap, x, y, zoom);
