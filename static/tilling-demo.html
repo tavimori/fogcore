@@ -54,6 +54,13 @@
         <img id="mapImage" alt="Map Image" src="" width="600">
     </div>
 
+    <script type="module">
+        import init, {greet} from "../pkg/fogcore.js";
+        init().then(() => {
+            greet();
+        });
+    </script>
+
     <script>
         const sliders = [
             {slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value'},
