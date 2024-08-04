@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Tiling Service Demo</title>
+    <style>
+        .slider-container {
+            margin: 20px;
+        }
+        .map-container {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="slider-container">
+        <label for="minLng1">Min Longitude1: </label>
+        <input id="minLng1" type="number" value="-180">
+        <label for="maxLng1">Max Longitude1: </label>
+        <input id="maxLng1" type="number" value="180">
+        <input id="lng1" type="range" min="-180" max="180" step="0.01" value="0">
+        <span id="lng1Value">0</span>
+
+        <br>
+
+        <label for="minLat1">Min Latitude1: </label>
+        <input id="minLat1" type="number" value="-90">
+        <label for="maxLat1">Max Latitude1: </label>
+        <input id="maxLat1" type="number" value="90">
+        <input id="lat1" type="range" min="-90" max="90" step="0.01" value="0">
+        <span id="lat1Value">0</span>
+
+        <br>
+
+        <label for="minLng2">Min Longitude2: </label>
+        <input id="minLng2" type="number" value="-180">
+        <label for="maxLng2">Max Longitude2: </label>
+        <input id="maxLng2" type="number" value="180">
+        <input id="lng2" type="range" min="-180" max="180" step="0.01" value="0">
+        <span id="lng2Value">0</span>
+
+        <br>
+
+        <label for="minLat2">Min Latitude2: </label>
+        <input id="minLat2" type="number" value="-90">
+        <label for="maxLat2">Max Latitude2: </label>
+        <input id="maxLat2" type="number" value="90">
+        <input id="lat2" type="range" min="-90" max="90" step="0.01" value="0">
+        <span id="lat2Value">0</span>
+    </div>
+
+    <div class="map-container">
+        <img id="mapImage" alt="Map Image" src="" width="600">
+    </div>
+
+    <script>
+        const sliders = [
+            {slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value'},
+            {slider: 'lat1', min: 'minLat1', max: 'maxLat1', valueField: 'lat1Value'},
+            {slider: 'lng2', min: 'minLng2', max: 'maxLng2', valueField: 'lng2Value'},
+            {slider: 'lat2', min: 'minLat2', max: 'maxLat2', valueField: 'lat2Value'}
+        ];
+
+        sliders.forEach(({slider, min, max, valueField}) => {
+            document.getElementById(min).addEventListener('input', () => updateSlider(slider, min, max, valueField));
+            document.getElementById(max).addEventListener('input', () => updateSlider(slider, min, max, valueField));
+            document.getElementById(slider).addEventListener('input', () => updateSliderValue(slider, valueField));
+            updateSlider(slider, min, max, valueField);
+        });
+
+        function updateSlider(slider, min, max, valueField) {
+            const minValue = parseFloat(document.getElementById(min).value);
+            const maxValue = parseFloat(document.getElementById(max).value);
+
+            const sliderElement = document.getElementById(slider);
+            sliderElement.min = minValue;
+            sliderElement.max = maxValue;
+
+            const value = Math.min(Math.max(parseFloat(sliderElement.value), minValue), maxValue);
+            sliderElement.value = value;
+
+            document.getElementById(valueField).textContent = value;
+
+            updateImage();
+        }
+
+        function updateSliderValue(slider, valueField) {
+            const sliderElement = document.getElementById(slider);
+            const value = parseFloat(sliderElement.value);
+            document.getElementById(valueField).textContent = value;
+
+            updateImage();
+        }
+
+        function updateImage() {
+            const lng1 = document.getElementById('lng1').value;
+            const lat1 = document.getElementById('lat1').value;
+            const lng2 = document.getElementById('lng2').value;
+            const lat2 = document.getElementById('lat2').value;
+
+            const imageUrl = `https://example.com/map?lng1=${lng1}&lat1=${lat1}&lng2=${lng2}&lat2=${lat2}`;
+            document.getElementById('mapImage').src = imageUrl;
+        }
+
+        updateImage();
+    </script>
+</body>
+</html>
