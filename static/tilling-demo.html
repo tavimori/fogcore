@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,12 +9,26 @@
         .slider-container {
             margin: 20px;
         }
+
         .map-container {
             margin-top: 30px;
         }
+
+        #zdir {
+            border: 5px solid;
+            width: 100%;
+            height: 100%;
+            /* background-color: grey; */
+        }
     </style>
+    <script src="filedrop-min.js"></script>
 </head>
+
 <body>
+    <h1>Tilling Demo</h1>
+    <div id="zdir">
+        <p>Please drag your "Sync" folder here, or click to choose every files inside it.</p>
+    </div>
     <div class="slider-container">
         <label for="minLng1">Min Longitude1: </label>
         <input id="minLng1" type="number" value="-180">
@@ -55,21 +70,88 @@
     </div>
 
     <script type="module">
-        import init, {greet} from "../pkg/fogcore.js";
+        import init, { FogMap, FogRenderer } from "../pkg/fogcore.js";
         init().then(() => {
-            greet();
+            let fogMap = new FogMap();
+            const zone = new FileDrop('zdir');
+            zone.multiple(true);
+
+            zone.event('send', function (files) {
+                files.each(function (file) {
+                    console.log(file.name + ' (' + file.size + ') bytes')
+                    file.readData(
+                        function (data) {
+                            const arr = new Uint8Array(data);
+                            fogMap.add_fow_file(file.name, arr);
+                        },
+                        function (e) {
+                            console.log(`cannot read ${file.name}`)
+                        }
+                    )
+                })
+            })
+
+            zone.event('upload', function (e) {
+
+                var error = function () {
+                    alert('Problem reading the file system.');
+                }
+
+                var done = function (files) {
+                    // files is standard FileDrop's FileList object.
+                    files.each(function (file) {
+                        // file is FileDrop.File with native objects accessible
+                        // as file.nativeFile and file.nativeEntry.
+                        // var node = document.createElement('p');
+                        // node.innerText = file.name
+
+                        if (file.nativeFile) {
+                            // This is a file. We can use any FileDrop method here
+                            // like sendTo() and readData() - see below.
+
+                            file.readData(
+                                function (data) {
+                                    const arr = new Uint8Array(data);
+                                    fogMap.add_fow_file(file.name, arr);
+                                },
+                                function (e) {
+                                    console.log(`cannot read ${file.name}`)
+                                }
+                            )
+
+                        } else {
+                            console.log(`${file.name} is a folder?`);
+                            // file.listEntries(showfilenames, error)
+                            // debugger;
+                        }
+
+                    });
+                };
+
+                zone.eventFiles(e).each(function (root) {
+                    if (root.listEntries(done, error)) {
+                        // Success.
+                    } else if (!root.nativeEntry) {
+                        zone.el.innerHTML = '<p><b>File System API is not' +
+                            ' supported by this browser.</b></p>';
+                    } else {
+                        zone.el.innerHTML = '<p><b>Problem listing ' +
+                            root.name + '.</b></p>';
+                    }
+                });
+            });
         });
     </script>
 
     <script>
         const sliders = [
-            {slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value'},
-            {slider: 'lat1', min: 'minLat1', max: 'maxLat1', valueField: 'lat1Value'},
-            {slider: 'lng2', min: 'minLng2', max: 'maxLng2', valueField: 'lng2Value'},
-            {slider: 'lat2', min: 'minLat2', max: 'maxLat2', valueField: 'lat2Value'}
+            { slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value' },
+            { slider: 'lat1', min: 'minLat1', max: 'maxLat1', valueField: 'lat1Value' },
+            { slider: 'lng2', min: 'minLng2', max: 'maxLng2', valueField: 'lng2Value' },
+            { slider: 'lat2', min: 'minLat2', max: 'maxLat2', valueField: 'lat2Value' }
         ];
 
-        sliders.forEach(({slider, min, max, valueField}) => {
+        sliders.forEach(({ slider, min, max, valueField }) => {
             document.getElementById(min).addEventListener('input', () => updateSlider(slider, min, max, valueField));
             document.getElementById(max).addEventListener('input', () => updateSlider(slider, min, max, valueField));
             document.getElementById(slider).addEventListener('input', () => updateSliderValue(slider, valueField));
@@ -113,4 +195,5 @@
         updateImage();
     </script>
 </body>
+
 </html>

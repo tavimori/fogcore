@@ -8,18 +8,7 @@
 pub mod fogmaps;
 pub mod renderer;
 mod utils;
+pub mod wasm;
 
 pub use fogmaps::FogMap;
 pub use renderer::FogRenderer;
-
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, fogcore!");
-}
