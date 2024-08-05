@@ -70,7 +70,7 @@
     </div>
 
     <script type="module">
-        import init, { FogMap, FogRenderer } from "../pkg/fogcore.js";
+        import init, { FogMap, FogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
         init().then(() => {
             let fogMap = new FogMap();
             const zone = new FileDrop('zdir');
@@ -83,6 +83,16 @@
                         function (data) {
                             const arr = new Uint8Array(data);
                             fogMap.add_fow_file(file.name, arr);
+                            let render = new FogRenderer();
+                            let zoom = 8;
+                            // 114.13706787440267,22.677953818694945
+                            let x = lng_to_tile_x(114.137, zoom);
+                            let y = lat_to_tile_y(22.678, zoom);
+
+                            let imageData = render.render_image(fogMap, x, y, zoom);
+                            renderImageOn(imageData, "mapImage");
+
+
                         },
                         function (e) {
                             console.log(`cannot read ${file.name}`)
@@ -144,6 +154,24 @@
     </script>
 
     <script>
+        window.renderImageOn = (imageData, imageId) => {
+            console.log(`starting to render image for ${imageId}...`);
+            const blob = new Blob([imageData], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+
+            const imageDom = document.getElementById(imageId);
+            console.log(`imageDom loaded.`);
+
+            const oldUrl = imageDom.src;
+            imageDom.src = url;
+
+            console.log(`src replaced.`);
+
+            if (oldUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(oldUrl);
+            }
+        }
+
         const sliders = [
             { slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value' },
             { slider: 'lat1', min: 'minLat1', max: 'maxLat1', valueField: 'lat1Value' },
