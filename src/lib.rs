@@ -8,6 +8,8 @@
 pub mod fogmaps;
 pub mod renderer;
 mod utils;
+
+#[cfg(feature = "wasm")]
 pub mod wasm;
 
 pub use fogmaps::FogMap;

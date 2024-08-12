@@ -29,7 +29,6 @@ fn main() {
     let lng = 116.39290;
     let lat = 39.91535;
 
-
     for zoom in 0..22 {
         // https://developers.google.com/maps/documentation/javascript/coordinates
         let (x, y) = lng_lat_to_tile_x_y(lng, lat, zoom);
