@@ -12,5 +12,7 @@ mod utils;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+mod gpu;
+
 pub use fogmaps::FogMap;
 pub use renderer::FogRenderer;
