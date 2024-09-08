@@ -8,6 +8,7 @@
     <link href='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin: 0; padding: 20px; }
+        .container { display: flex; gap: 20px; }
         #map { width: 600px; height: 400px; }
         #mapImage { image-rendering: pixelated; width: 512px; height: 512px; }
         .boxdraw {
@@ -19,30 +20,37 @@
             width: 0;
             height: 0;
         }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
         #info {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: white;
-            padding: 10px;
-            border-radius: 3px;
+            display: flex;
+            gap: 10px;
+        }
+        #info p {
+            margin: 0;
         }
     </style>
 </head>
 
 <body>
     <h1>Fogcore Demo</h1>
-    <div>
+    <div class="controls">
         <button id="rerender">Rerender</button>
         <button id="zoom-in-out">Zoom In/Out</button>
-    </div>
-    <div id="map"></div>
     <div id="info">
         <p>X: <span id="x"></span></p>
         <p>Y: <span id="y"></span></p>
         <p>Zoom: <span id="zoom"></span></p>
     </div>
-    <canvas id="mapImage" width="256" height="256"></canvas>
+    </div>
+    <div class="container">
+        <canvas id="mapImage" width="512" height="512"></canvas>
+        <div id="map"></div>
+    </div>
 
     <script type="module">
         import init, { FogMap, FogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
@@ -51,8 +59,8 @@
         const map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/streets-v12',
-            center: [113.9, 22.8], // Centered on Guangzhou-Shenzhen-Hong Kong bay area
-            zoom: 8 // Adjusted zoom level for better view of the bay area
+            center: [114.1, 22.7], // Centered on Guangzhou-Shenzhen-Hong Kong bay area
+            zoom: 9 // Adjusted zoom level for better view of the bay area
         });
 
         map.boxZoom.disable();
