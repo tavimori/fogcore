@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>Fog of War Demo</title>
+    <title>Fogcore Demo</title>
     <script src='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css' rel='stylesheet' />
     <style>
@@ -31,7 +31,11 @@
 </head>
 
 <body>
-    <h1>Fog of War Demo</h1>
+    <h1>Fogcore Demo</h1>
+    <div>
+        <button id="rerender">Rerender</button>
+        <button id="zoom-in-out">Zoom In/Out</button>
+    </div>
     <div id="map"></div>
     <div id="info">
         <p>X: <span id="x"></span></p>
@@ -47,8 +51,8 @@
         const map = new mapboxgl.Map({
             container: 'map',
             style: 'mapbox://styles/mapbox/streets-v12',
-            center: [-98, 38.88],
-            zoom: 3
+            center: [113.9, 22.8], // Centered on Guangzhou-Shenzhen-Hong Kong bay area
+            zoom: 8 // Adjusted zoom level for better view of the bay area
         });
 
         map.boxZoom.disable();
@@ -119,8 +123,11 @@
             img.src = url;
         }
 
+        let fogMap;
+        let currentLng, currentLat, currentZoom;
+
         map.on('load', async () => {
-            const fogMap = await initializeFogMap();
+            fogMap = await initializeFogMap();
             const canvas = map.getCanvasContainer();
 
             function onMouseDown(e) {
@@ -179,19 +186,65 @@
                         map.unproject(bbox[1])
                     );
                     const center = bounds.getCenter();
-                    const zoom = map.getZoom();
+                    const zoom = Math.floor(map.getZoom());
                     const x = lng_to_tile_x(center.lng, zoom);
                     const y = lat_to_tile_y(center.lat, zoom);
                     
                     document.getElementById('x').textContent = x;
                     document.getElementById('y').textContent = y;
-                    
-                    document.getElementById('zoom').textContent = zoom.toFixed(2);
+                    document.getElementById('zoom').textContent = zoom;
 
                     renderFogMap(fogMap, x, y, zoom);
                 }
                 map.dragPan.enable();
             }
+
+            function updateInfo() {
+                const center = map.getCenter();
+                currentLng = center.lng;
+                currentLat = center.lat;
+                currentZoom = Math.floor(map.getZoom());
+                const currentX = lng_to_tile_x(currentLng, currentZoom);
+                const currentY = lat_to_tile_y(currentLat, currentZoom);
+                
+                document.getElementById('x').textContent = currentX;
+                document.getElementById('y').textContent = currentY;
+                document.getElementById('zoom').textContent = currentZoom;
+
+                return { x: currentX, y: currentY, zoom: currentZoom };
+            }
+
+            function rerenderImage() {
+                const { x, y, zoom } = updateInfo();
+                    renderFogMap(fogMap, x, y, zoom);
+                    renderFogMap(fogMap, x, y, zoom);
+                renderFogMap(fogMap, x, y, zoom);
+            }
+
+            async function zoomInOut() {
+                const originalZoom = currentZoom;
+                const zoomLevels = [
+                    ...Array(5).fill(1),  // Zoom in 5 levels
+                    ...Array(10).fill(-1) // Zoom out 10 levels
+                ];
+
+                for (const zoomChange of zoomLevels) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    currentZoom += zoomChange;
+                    const x = lng_to_tile_x(currentLng, currentZoom);
+                    const y = lat_to_tile_y(currentLat, currentZoom);
+                    renderFogMap(fogMap, x, y, currentZoom);
+                }
+
+                currentZoom = originalZoom;
+                rerenderImage();
+            }
+
+            document.getElementById('rerender').addEventListener('click', rerenderImage);
+            document.getElementById('zoom-in-out').addEventListener('click', zoomInOut);
+
+            map.on('moveend', rerenderImage);
+            rerenderImage();
 
             canvas.addEventListener('mousedown', onMouseDown, true);
         });
