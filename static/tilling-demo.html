@@ -184,9 +184,9 @@
                     const y = lat_to_tile_y(center.lat, zoom);
                     
                     document.getElementById('x').textContent = x;
-                    // .toFixed(2);
                     document.getElementById('y').textContent = y;
-                    document.getElementById('zoom').textContent = zoom;
+                    
+                    document.getElementById('zoom').textContent = zoom.toFixed(2);
 
                     renderFogMap(fogMap, x, y, zoom);
                 }
