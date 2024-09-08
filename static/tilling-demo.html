@@ -1,38 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fogcore Demo</title>
+    <meta charset="utf-8" />
+    <title>Fog of War Demo</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css' rel='stylesheet' />
     <style>
-        .slider-container {
-            margin: 20px;
+        body { margin: 0; padding: 20px; }
+        #map { width: 600px; height: 400px; }
+        #mapImage { image-rendering: pixelated; width: 512px; height: 512px; }
+        .boxdraw {
+            background: rgba(56, 135, 190, 0.1);
+            border: 2px solid #3887be;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
         }
-
-        .map-container {
-            margin-top: 30px;
-        }
-
-        #zdir {
-            border: 5px solid;
-            width: 100%;
-            height: 100%;
-            /* background-color: grey; */
+        #info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 3px;
         }
     </style>
-    <script src="filedrop-min.js"></script>
 </head>
 
 <body>
-    <h1>Fogcore Track Tilling Demo</h1>
-
-    <div class="map-container">
-        <img id="mapImage" alt="Map Image" src="" width="600">
+    <h1>Fog of War Demo</h1>
+    <div id="map"></div>
+    <div id="info">
+        <p>X: <span id="x"></span></p>
+        <p>Y: <span id="y"></span></p>
+        <p>Zoom: <span id="zoom"></span></p>
     </div>
+    <canvas id="mapImage" width="256" height="256"></canvas>
 
     <script type="module">
         import init, { FogMap, FogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
+        
+        mapboxgl.accessToken = 'SOME_MAPBOX_TOKEN'; // Replace with your actual token
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-98, 38.88],
+            zoom: 3
+        });
+
+        map.boxZoom.disable();
+
+        let start, current, box;
         
         async function loadFile(filename) {
             const response = await fetch(`tiles/${filename}`);
@@ -44,7 +65,6 @@
             await init();
             let fogMap = new FogMap();
             
-            // List of predefined files to load
             const files = [
                 '2573lljsijod',    
                 '33c1lljorhmz',
@@ -64,38 +84,117 @@
                 }
             }
 
-            // Initial render
-            let render = new FogRenderer();
-            let zoom = 8;
-            let x = lng_to_tile_x(114.137, zoom);
-            let y = lat_to_tile_y(22.678, zoom);
-
-            let imageData = render.render_image(fogMap, x, y, zoom);
-            renderImageOn(imageData, "mapImage");
+            return fogMap;
         }
 
-        initializeFogMap();
-    </script>
-
-    <script>
-        window.renderImageOn = (imageData, imageId) => {
-            console.log(`starting to render image for ${imageId}...`);
-            const blob = new Blob([imageData], { type: 'image/png' });
+        function renderFogMap(fogMap, x, y, zoom) {
+            let render = new FogRenderer();
+            let pngData = render.render_image(fogMap, x, y, zoom);
+            
+            // Convert the PNG data to a Blob
+            const blob = new Blob([pngData], { type: 'image/png' });
+            
+            // Create a URL for the Blob
             const url = URL.createObjectURL(blob);
 
-            const imageDom = document.getElementById(imageId);
-            console.log(`imageDom loaded.`);
-
-            const oldUrl = imageDom.src;
-            imageDom.src = url;
-
-            console.log(`src replaced.`);
-
-            if (oldUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(oldUrl);
-            }
+            // Create an Image object
+            const img = new Image();
+            
+            // Set up an onload handler to draw the image onto the canvas once it's loaded
+            img.onload = function() {
+                const canvas = document.getElementById("mapImage");
+                const ctx = canvas.getContext("2d");
+                
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw the image onto the canvas
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Release the object URL
+                URL.revokeObjectURL(url);
+            };
+            
+            // Set the image source to the Blob URL
+            img.src = url;
         }
+
+        map.on('load', async () => {
+            const fogMap = await initializeFogMap();
+            const canvas = map.getCanvasContainer();
+
+            function onMouseDown(e) {
+                if (!(e.shiftKey && e.button === 0)) return;
+                map.dragPan.disable();
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('keydown', onKeyDown);
+                start = mousePos(e);
+            }
+
+            function onMouseMove(e) {
+                current = mousePos(e);
+                if (!box) {
+                    box = document.createElement('div');
+                    box.classList.add('boxdraw');
+                    canvas.appendChild(box);
+                }
+                const minX = Math.min(start.x, current.x);
+                const maxX = Math.max(start.x, current.x);
+                const minY = Math.min(start.y, current.y);
+                const maxY = Math.max(start.y, current.y);
+                const pos = `translate(${minX}px, ${minY}px)`;
+                box.style.transform = pos;
+                box.style.width = maxX - minX + 'px';
+                box.style.height = maxY - minY + 'px';
+            }
+
+            function onMouseUp(e) {
+                finish([start, mousePos(e)]);
+            }
+
+            function onKeyDown(e) {
+                if (e.keyCode === 27) finish();
+            }
+
+            function mousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                return new mapboxgl.Point(
+                    e.clientX - rect.left - canvas.clientLeft,
+                    e.clientY - rect.top - canvas.clientTop
+                );
+            }
+
+            function finish(bbox) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('keydown', onKeyDown);
+                document.removeEventListener('mouseup', onMouseUp);
+                if (box) {
+                    box.parentNode.removeChild(box);
+                    box = null;
+                }
+                if (bbox) {
+                    const bounds = new mapboxgl.LngLatBounds(
+                        map.unproject(bbox[0]),
+                        map.unproject(bbox[1])
+                    );
+                    const center = bounds.getCenter();
+                    const zoom = map.getZoom();
+                    const x = lng_to_tile_x(center.lng, zoom);
+                    const y = lat_to_tile_y(center.lat, zoom);
+                    
+                    document.getElementById('x').textContent = x;
+                    // .toFixed(2);
+                    document.getElementById('y').textContent = y;
+                    document.getElementById('zoom').textContent = zoom;
+
+                    renderFogMap(fogMap, x, y, zoom);
+                }
+                map.dragPan.enable();
+            }
+
+            canvas.addEventListener('mousedown', onMouseDown, true);
+        });
     </script>
 </body>
-
 </html>
