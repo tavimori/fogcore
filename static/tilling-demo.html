@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Tiling Service Demo</title>
+    <title>Fogcore Demo</title>
     <style>
         .slider-container {
             margin: 20px;
@@ -25,45 +25,7 @@
 </head>
 
 <body>
-    <h1>Tilling Demo</h1>
-    <div id="zdir">
-        <p>Please drag your "Sync" folder here, or click to choose every files inside it.</p>
-    </div>
-    <div class="slider-container">
-        <label for="minLng1">Min Longitude1: </label>
-        <input id="minLng1" type="number" value="-180">
-        <label for="maxLng1">Max Longitude1: </label>
-        <input id="maxLng1" type="number" value="180">
-        <input id="lng1" type="range" min="-180" max="180" step="0.01" value="0">
-        <span id="lng1Value">0</span>
-
-        <br>
-
-        <label for="minLat1">Min Latitude1: </label>
-        <input id="minLat1" type="number" value="-90">
-        <label for="maxLat1">Max Latitude1: </label>
-        <input id="maxLat1" type="number" value="90">
-        <input id="lat1" type="range" min="-90" max="90" step="0.01" value="0">
-        <span id="lat1Value">0</span>
-
-        <br>
-
-        <label for="minLng2">Min Longitude2: </label>
-        <input id="minLng2" type="number" value="-180">
-        <label for="maxLng2">Max Longitude2: </label>
-        <input id="maxLng2" type="number" value="180">
-        <input id="lng2" type="range" min="-180" max="180" step="0.01" value="0">
-        <span id="lng2Value">0</span>
-
-        <br>
-
-        <label for="minLat2">Min Latitude2: </label>
-        <input id="minLat2" type="number" value="-90">
-        <label for="maxLat2">Max Latitude2: </label>
-        <input id="maxLat2" type="number" value="90">
-        <input id="lat2" type="range" min="-90" max="90" step="0.01" value="0">
-        <span id="lat2Value">0</span>
-    </div>
+    <h1>Fogcore Track Tilling Demo</h1>
 
     <div class="map-container">
         <img id="mapImage" alt="Map Image" src="" width="600">
@@ -71,86 +33,48 @@
 
     <script type="module">
         import init, { FogMap, FogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
-        init().then(() => {
+        
+        async function loadFile(filename) {
+            const response = await fetch(`tiles/${filename}`);
+            const arrayBuffer = await response.arrayBuffer();
+            return new Uint8Array(arrayBuffer);
+        }
+
+        async function initializeFogMap() {
+            await init();
             let fogMap = new FogMap();
-            const zone = new FileDrop('zdir');
-            zone.multiple(true);
+            
+            // List of predefined files to load
+            const files = [
+                '2573lljsijod',    
+                '33c1lljorhmz',
+                '3fc9lorjsrwm',
+                '5158lljorlmi',
+                'cab3lotijkdk',
+                // Add more files as needed
+            ];
 
-            zone.event('send', function (files) {
-                files.each(function (file) {
-                    console.log(file.name + ' (' + file.size + ') bytes')
-                    file.readData(
-                        function (data) {
-                            const arr = new Uint8Array(data);
-                            fogMap.add_fow_file(file.name, arr);
-                            let render = new FogRenderer();
-                            let zoom = 8;
-                            // 114.13706787440267,22.677953818694945
-                            let x = lng_to_tile_x(114.137, zoom);
-                            let y = lat_to_tile_y(22.678, zoom);
-
-                            let imageData = render.render_image(fogMap, x, y, zoom);
-                            renderImageOn(imageData, "mapImage");
-
-
-                        },
-                        function (e) {
-                            console.log(`cannot read ${file.name}`)
-                        }
-                    )
-                })
-            })
-
-            zone.event('upload', function (e) {
-
-                var error = function () {
-                    alert('Problem reading the file system.');
+            for (const file of files) {
+                try {
+                    const data = await loadFile(file);
+                    fogMap.add_fow_file(file, data);
+                    console.log(`Loaded ${file}`);
+                } catch (error) {
+                    console.error(`Failed to load ${file}:`, error);
                 }
+            }
 
-                var done = function (files) {
-                    // files is standard FileDrop's FileList object.
-                    files.each(function (file) {
-                        // file is FileDrop.File with native objects accessible
-                        // as file.nativeFile and file.nativeEntry.
-                        // var node = document.createElement('p');
-                        // node.innerText = file.name
+            // Initial render
+            let render = new FogRenderer();
+            let zoom = 8;
+            let x = lng_to_tile_x(114.137, zoom);
+            let y = lat_to_tile_y(22.678, zoom);
 
-                        if (file.nativeFile) {
-                            // This is a file. We can use any FileDrop method here
-                            // like sendTo() and readData() - see below.
+            let imageData = render.render_image(fogMap, x, y, zoom);
+            renderImageOn(imageData, "mapImage");
+        }
 
-                            file.readData(
-                                function (data) {
-                                    const arr = new Uint8Array(data);
-                                    fogMap.add_fow_file(file.name, arr);
-                                },
-                                function (e) {
-                                    console.log(`cannot read ${file.name}`)
-                                }
-                            )
-
-                        } else {
-                            console.log(`${file.name} is a folder?`);
-                            // file.listEntries(showfilenames, error)
-                            // debugger;
-                        }
-
-                    });
-                };
-
-                zone.eventFiles(e).each(function (root) {
-                    if (root.listEntries(done, error)) {
-                        // Success.
-                    } else if (!root.nativeEntry) {
-                        zone.el.innerHTML = '<p><b>File System API is not' +
-                            ' supported by this browser.</b></p>';
-                    } else {
-                        zone.el.innerHTML = '<p><b>Problem listing ' +
-                            root.name + '.</b></p>';
-                    }
-                });
-            });
-        });
+        initializeFogMap();
     </script>
 
     <script>
@@ -171,56 +95,6 @@
                 URL.revokeObjectURL(oldUrl);
             }
         }
-
-        const sliders = [
-            { slider: 'lng1', min: 'minLng1', max: 'maxLng1', valueField: 'lng1Value' },
-            { slider: 'lat1', min: 'minLat1', max: 'maxLat1', valueField: 'lat1Value' },
-            { slider: 'lng2', min: 'minLng2', max: 'maxLng2', valueField: 'lng2Value' },
-            { slider: 'lat2', min: 'minLat2', max: 'maxLat2', valueField: 'lat2Value' }
-        ];
-
-        sliders.forEach(({ slider, min, max, valueField }) => {
-            document.getElementById(min).addEventListener('input', () => updateSlider(slider, min, max, valueField));
-            document.getElementById(max).addEventListener('input', () => updateSlider(slider, min, max, valueField));
-            document.getElementById(slider).addEventListener('input', () => updateSliderValue(slider, valueField));
-            updateSlider(slider, min, max, valueField);
-        });
-
-        function updateSlider(slider, min, max, valueField) {
-            const minValue = parseFloat(document.getElementById(min).value);
-            const maxValue = parseFloat(document.getElementById(max).value);
-
-            const sliderElement = document.getElementById(slider);
-            sliderElement.min = minValue;
-            sliderElement.max = maxValue;
-
-            const value = Math.min(Math.max(parseFloat(sliderElement.value), minValue), maxValue);
-            sliderElement.value = value;
-
-            document.getElementById(valueField).textContent = value;
-
-            updateImage();
-        }
-
-        function updateSliderValue(slider, valueField) {
-            const sliderElement = document.getElementById(slider);
-            const value = parseFloat(sliderElement.value);
-            document.getElementById(valueField).textContent = value;
-
-            updateImage();
-        }
-
-        function updateImage() {
-            const lng1 = document.getElementById('lng1').value;
-            const lat1 = document.getElementById('lat1').value;
-            const lng2 = document.getElementById('lng2').value;
-            const lat2 = document.getElementById('lat2').value;
-
-            const imageUrl = `https://example.com/map?lng1=${lng1}&lat1=${lat1}&lng2=${lng2}&lat2=${lat2}`;
-            document.getElementById('mapImage').src = imageUrl;
-        }
-
-        updateImage();
     </script>
 </body>
 
