@@ -90,49 +90,58 @@ impl FogRenderer {
         .render_pixmap(fogmap_native_ref, view_x, view_y, zoom);
 
         // Apply blur filter
-        self.apply_blur_filter(&mut pixmap);
+        self.apply_alpha_dilation(&mut pixmap);
 
         // Encode the blurred image to PNG
         pixmap.encode_png().unwrap()
     }
 
-    fn apply_blur_filter(&self, pixmap: &mut Pixmap) {
-        let kernel: [f32; 9] = [
-            1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0,
-            2.0 / 16.0, 4.0 / 16.0, 2.0 / 16.0,
-            1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0
-        ];
-
+    fn apply_alpha_dilation(&self, pixmap: &mut Pixmap) {
         let width = pixmap.width();
         let height = pixmap.height();
         let mut new_data = pixmap.data().to_vec();
 
-        for y in 1..height-1 {
-            for x in 1..width-1 {
-                let mut r = 0.0;
-                let mut g = 0.0;
-                let mut b = 0.0;
-                let mut a = 0.0;
+        // 5x5 kernel for distance-based weight
+        let kernel: [[f32; 5]; 5] = [
+            [0.3, 0.5, 0.7, 0.5, 0.3],
+            [0.5, 1.0, 1.0, 1.0, 0.5],
+            [0.7, 1.0, 1.0, 1.0, 0.7],
+            [0.5, 1.0, 1.0, 1.0, 0.5],
+            [0.3, 0.5, 0.7, 0.5, 0.3],
+        ];
 
-                for ky in 0..3 {
-                    for kx in 0..3 {
-                        let px = x as i32 + kx - 1;
-                        let py = y as i32 + ky - 1;
-                        let weight = kernel[(ky * 3 + kx) as usize];
+        for y in 2..height-2 {
+            for x in 2..width-2 {
+                let mut min_alpha = 256.0;
+                let mut max_r = 0;
+                let mut max_g = 0;
+                let mut max_b = 0;
+                let self_idx = (y * width + x) as usize * 4;
+                let self_alpha = pixmap.data()[self_idx + 3] as f32;
+
+                for ky in 0..5 {
+                    for kx in 0..5 {
+                        let px = x as i32 + kx - 2;
+                        let py = y as i32 + ky - 2;
+                        let weight = kernel[ky as usize][kx as usize];
 
                         let idx = (py * width as i32 + px) as usize * 4;
-                        r += pixmap.data()[idx] as f32 * weight;
-                        g += pixmap.data()[idx + 1] as f32 * weight;
-                        b += pixmap.data()[idx + 2] as f32 * weight;
-                        a += pixmap.data()[idx + 3] as f32 * weight;
+                        let mut alpha = pixmap.data()[idx + 3] as f32 * weight + self_alpha * (1.0 - weight);
+
+                        if alpha < min_alpha {
+                            min_alpha = alpha;
+                            max_r = pixmap.data()[idx];
+                            max_g = pixmap.data()[idx + 1];
+                            max_b = pixmap.data()[idx + 2];
+                        }
                     }
                 }
 
                 let idx = (y * width + x) as usize * 4;
-                new_data[idx] = r as u8;
-                new_data[idx + 1] = g as u8;
-                new_data[idx + 2] = b as u8;
-                new_data[idx + 3] = a as u8;
+                new_data[idx] = max_r;
+                new_data[idx + 1] = max_g;
+                new_data[idx + 2] = max_b;
+                new_data[idx + 3] = min_alpha as u8;
             }
         }
 
