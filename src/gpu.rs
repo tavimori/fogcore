@@ -1,6 +1,8 @@
 use wgpu::{self, Device, Queue, Buffer, BindGroup, ComputePipeline};
 use std::sync::Arc;
-use crate::renderer::FogRenderer as FogRendererNative;
+use crate::log_print;
+use wasm_bindgen_futures::spawn_local;
+
 
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
 
@@ -34,6 +36,8 @@ impl GpuFogRenderer {
             .await
             .unwrap();
 
+        log_print!("Adapter created: {:?}", adapter.get_info());
+
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -47,6 +51,8 @@ impl GpuFogRenderer {
             .await
             .unwrap();
 
+        log_print!("Device created: {:?}, {:?}", device.features(), device.limits());
+
         let device = Arc::new(device);
         let queue = Arc::new(queue);
 
@@ -55,6 +61,7 @@ impl GpuFogRenderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("fog_shader.wgsl").into()),
         });
 
+        log_print!("creating buffer size: {}", width * height * 4);
         let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Input Buffer"),
             size: (width * height * 4) as u64,
@@ -134,12 +141,13 @@ impl GpuFogRenderer {
             output_buffer,
             width,
             height,
-            // renderer: FogRendererNative::new(),
         }
     }
 
-    pub fn process_frame(&self, input: &[u8]) -> Vec<u8> {
+    pub fn process_frame(&self, input: &[u8], callback: Box<dyn Fn(Vec<u8>)>) {
+        log_print!("Starting process_frame, input length: {}", input.len());
         self.queue.write_buffer(&self.input_buffer, 0, input);
+        log_print!("Input buffer written");
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Compute Encoder"),
@@ -154,6 +162,7 @@ impl GpuFogRenderer {
             compute_pass.set_bind_group(0, &self.bind_group, &[]);
             compute_pass.dispatch_workgroups(self.width / WORKGROUP_SIZE.0, self.height / WORKGROUP_SIZE.1, 1);
         }
+        log_print!("Compute pass encoded");
 
         let staging_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Staging Buffer"),
@@ -162,40 +171,37 @@ impl GpuFogRenderer {
             mapped_at_creation: false,
         });
 
+        let staging_buffer_arc = Arc::new(staging_buffer);
+
         encoder.copy_buffer_to_buffer(
             &self.output_buffer,
             0,
-            &staging_buffer,
+            &staging_buffer_arc,
             0,
             (self.width * self.height * 4) as u64,
         );
+        log_print!("Buffer copy encoded");
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.queue.submit(Some(encoder.finish()));
+        log_print!("Commands submitted");
 
-        let buffer_slice = staging_buffer.slice(..);
+
+        let staging_buffer_arc2 = staging_buffer_arc.clone();
+        let buffer_slice = staging_buffer_arc2.slice(..);
+
         let (tx, rx) = std::sync::mpsc::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            tx.send(result).unwrap();
+            let _ = tx.send(result);
         });
 
-        // Poll the device in a loop
-        let mut i = 0;
-        while rx.try_recv().is_err() {
-            self.device.poll(wgpu::Maintain::Wait);
-            i += 1;
-            if i > 100000000 { // Arbitrary large number
-                panic!("GPU operation took too long");
-            }
-        }
-
-        // At this point, we should have received the result
-        let result = rx.try_recv().unwrap().unwrap();
-
-        let data = buffer_slice.get_mapped_range();
-        let result = data.to_vec();
-        drop(data);
-        staging_buffer.unmap();
-
-        result
+        spawn_local(async move {
+            let _ = rx.recv();
+            let buffer_slice3 = staging_buffer_arc2.slice(..);
+            
+            // Handle the mapped data here
+            let mapped_range = buffer_slice3.get_mapped_range();
+            log_print!("mapped data is of length: {}", mapped_range.len());
+            callback(mapped_range.to_vec());
+        });
     }
 }

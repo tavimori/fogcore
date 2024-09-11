@@ -27,6 +27,9 @@ wgpu = "22.1.0"
 bytemuck = "1.17.0"
 wasm-bindgen-futures = "0.4.43"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["console"] }
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
 

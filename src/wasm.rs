@@ -6,7 +6,8 @@ use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 use wasm_bindgen_futures::future_to_promise;
 use tiny_skia::{Pixmap, IntSize};
-use js_sys::{Uint8Array, Promise};
+use js_sys::{Uint8Array, Array, Promise};
+use crate::log_print;
 
 #[wasm_bindgen]
 extern "C" {
@@ -66,8 +67,11 @@ pub struct FogRenderer {
 impl FogRenderer {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
+        let mut render = FogRendererNative::new();
+        // FIXME: this is a hack to make the renderer work with the gpu renderer
+        render.set_tile_size_power(10);
         Self {
-            render: FogRendererNative::new(),
+            render,
         }
     }
 
@@ -126,7 +130,7 @@ impl FogRenderer {
                         let weight = kernel[ky as usize][kx as usize];
 
                         let idx = (py * width as i32 + px) as usize * 4;
-                        let mut alpha = pixmap.data()[idx + 3] as f32 * weight + self_alpha * (1.0 - weight);
+                        let alpha = pixmap.data()[idx + 3] as f32 * weight + self_alpha * (1.0 - weight);
 
                         if alpha < min_alpha {
                             min_alpha = alpha;
@@ -160,27 +164,47 @@ impl GpuFogRenderer {
     // #[wasm_bindgen(constructor)]
     pub fn create(width: u32, height: u32) -> Promise {
         future_to_promise(async move {
+            let mut renderer = FogRendererNative::new();
+            // FIXME: this is a hack to make the renderer work with the gpu renderer
+            renderer.set_tile_size_power(10);
             let gpu_renderer = GpuFogRendererNative::new(width, height).await;
             Ok(Self { 
-                renderer: FogRendererNative::new(),
-                gpu_renderer }.into())
+                renderer,
+                gpu_renderer
+            }.into())
         })
     }
 
     #[wasm_bindgen]
-    pub fn render_image(&self, fogmap: &FogMap, view_x: i64, view_y: i64, zoom: i16) -> Vec<u8> {
+    pub fn render_image(&self, fogmap: &FogMap, view_x: i64, view_y: i64, zoom: i16, callback: js_sys::Function) {
         let fogmap_native_ref = fogmap.get_native_fogmap_ref();
         let image_pix = self
             .renderer
             .render_pixmap(fogmap_native_ref, view_x, view_y, zoom);
         log("passing into gpu renderer");
         log(&format!("passing gpu image length: {}", image_pix.data().len()));
-        let gpu_image = self.gpu_renderer.process_frame(image_pix.data());
-        log(&format!("got gpu image length: {}", gpu_image.len()));
-        let image = Pixmap::from_vec(
-            gpu_image, 
-            IntSize::from_wh(image_pix.width(), image_pix.height()).unwrap()
-        ).unwrap().encode_png().unwrap();
-        image
+
+        let closure = move |v: Vec<u8>| {
+            log_print!("From closure of lenght {}", v.len());
+
+            // FIXME: this is a hack to make the image the correct size
+            let img = Pixmap::from_vec(
+                v, 
+                IntSize::from_wh(1024,1024).unwrap()
+            ).unwrap().encode_png().unwrap();
+
+            let js_array = Uint8Array::new_with_length((img.len()) as u32);
+            js_array.copy_from(&img);
+
+            // Create a JS Array to pass as arguments
+            let args = Array::new();
+            args.push(&js_array.into());
+
+            // Call the JavaScript function with the arguments
+            let _ = callback.apply(&JsValue::NULL, &args);
+        };
+    
+        
+        self.gpu_renderer.process_frame(image_pix.data(), Box::new(closure));
     }
 }

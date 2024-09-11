@@ -12,6 +12,8 @@ mod utils;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+mod logging;
+
 mod gpu;
 
 pub use fogmaps::FogMap;

@@ -100,13 +100,18 @@
         }
 
         function renderFogMap(fogmap, x, y, zoom) {
-            // let cpuRender = new FogRenderer();
             let cpuPngData = fogRenderer.render_image(fogmap, x, y, zoom);
-            // let gpuPngData = gpuFogRenderer.render_image(fogmap, x, y, zoom);
-            let gpuPngData = fogRenderer.render_and_blur_image(fogmap, x, y, zoom);
+            gpuFogRenderer.render_image(fogmap, x, y, zoom, 
+                (img) => {
+                    console.log(`img: ${img}`);
+                    renderImage(img, 'gpuMapImage');
+                }
+            );
 
             renderImage(cpuPngData, 'mapImage');
-            renderImage(gpuPngData, 'gpuMapImage');
+
+            // let gpuPngData = fogRenderer.render_and_blur_image(fogmap, x, y, zoom);
+            // renderImage(gpuPngData, 'gpuMapImage');
         }
 
         function renderImage(pngData, canvasId) {
@@ -131,7 +136,7 @@
         map.on('load', async () => {
             fogMap = await initializeFogMap();
             fogRenderer = new FogRenderer();
-            gpuFogRenderer = await GpuFogRenderer.create(256, 256);
+            gpuFogRenderer = await GpuFogRenderer.create(1024, 1024);
             console.log('gpu renderer created');
             const canvas = map.getCanvasContainer();
 
