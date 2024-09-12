@@ -18,3 +18,5 @@ mod renderer_gpu;
 
 pub use fogmaps::FogMap;
 pub use renderer::FogRenderer;
+pub use utils::*;
+

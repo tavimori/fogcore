@@ -2,6 +2,8 @@ use wgpu::{self, Device, Queue, Buffer, BindGroup, ComputePipeline};
 use std::sync::Arc;
 use crate::log_print;
 use wasm_bindgen_futures::spawn_local;
+use tokio::task;
+use tokio::sync::oneshot;
 
 
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
@@ -193,20 +195,42 @@ impl GpuFogRenderer {
         
         log_print!("buffer_slice created");
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = oneshot::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = tx.send(result);
         });
 
-        spawn_local(async move {
-            let _ = rx.await.unwrap();
-            let buffer_slice3 = staging_buffer_arc2.slice(..);
+
+        // task::spawn_local(async move {
+        //     let _ = rx.await.unwrap();
+        //     let buffer_slice3 = staging_buffer_arc2.slice(..);
             
-            // Handle the mapped data here
-            let mapped_range = buffer_slice3.get_mapped_range();
-            log_print!("mapped data is of length: {}", mapped_range.len());
-            callback(mapped_range.to_vec());
-        });
+        //     // Handle the mapped data here
+        //     let mapped_range = buffer_slice3.get_mapped_range();
+        //     log_print!("mapped data is of length: {}", mapped_range.len());
+        //     callback(mapped_range.to_vec());
+        // });
+
+
+        // if target is wasm, then we need to use spawn_local   
+        // if target is native, then we need to use task::spawn_local
+        if cfg!(target_arch = "wasm32") {
+            spawn_local(async move {
+                let _ = rx.await.unwrap();
+                let buffer_slice3 = staging_buffer_arc2.slice(..);
+                
+                let mapped_range = buffer_slice3.get_mapped_range();
+                callback(mapped_range.to_vec());
+            });
+        } else {
+            task::spawn_local(async move {
+                let _ = rx.await.unwrap();
+                let buffer_slice3 = staging_buffer_arc2.slice(..);
+                
+                let mapped_range = buffer_slice3.get_mapped_range();
+                callback(mapped_range.to_vec());
+            });
+        }
 
         log_print!("process_frame finished");
     }

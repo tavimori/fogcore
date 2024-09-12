@@ -1,7 +1,7 @@
 use crate::fogmaps::FogMap as FogMapNative;
 use crate::renderer::FogRenderer as FogRendererNative;
 use crate::renderer_gpu::GpuFogRenderer as GpuFogRendererNative;
-use std::f64::consts::PI;
+
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 use wasm_bindgen_futures::future_to_promise;
@@ -15,19 +15,6 @@ extern "C" {
     fn log(s: &str);
 }
 
-#[wasm_bindgen]
-pub fn lng_to_tile_x(lng: f64, zoom: i16) -> i64 {
-    let mul = (1 << zoom) as f64;
-    let x = (lng + 180.0) / 360.0 * mul;
-    x as i64
-}
-
-#[wasm_bindgen]
-pub fn lat_to_tile_y(lat: f64, zoom: i16) -> i64 {
-    let mul = (1 << zoom) as f64;
-    let y = (PI - (lat * PI / 180.0).tan().asinh()) * mul / (2.0 * PI);
-    y as i64
-}
 
 #[wasm_bindgen]
 pub struct FogMap {
