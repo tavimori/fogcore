@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
 
 // #[allow(dead_code)]
-pub struct GpuFogRenderer {
+pub struct FogRendererGpu {
     device: Arc<Device>,
     queue: Arc<Queue>,
     compute_pipeline: ComputePipeline,
@@ -21,7 +21,7 @@ pub struct GpuFogRenderer {
     // renderer: FogRendererNative,
 }
 
-impl GpuFogRenderer {
+impl FogRendererGpu {
     pub async fn new(width: u32, height: u32) -> Self {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),

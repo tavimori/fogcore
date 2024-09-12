@@ -1,6 +1,6 @@
 use crate::fogmaps::FogMap as FogMapNative;
 use crate::renderer::FogRenderer as FogRendererNative;
-use crate::renderer_gpu::GpuFogRenderer as GpuFogRendererNative;
+use crate::renderer::FogRendererGpu as FogRendererGpuNative;
 
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
@@ -143,7 +143,7 @@ impl FogRenderer {
 #[wasm_bindgen]
 pub struct GpuFogRenderer {
     renderer: FogRendererNative,
-    gpu_renderer: GpuFogRendererNative,
+    gpu_renderer: FogRendererGpuNative,
 }
 
 #[wasm_bindgen]
@@ -154,7 +154,7 @@ impl GpuFogRenderer {
             let mut renderer = FogRendererNative::new();
             // FIXME: this is a hack to make the renderer work with the gpu renderer
             renderer.set_tile_size_power(10);
-            let gpu_renderer = GpuFogRendererNative::new(width, height).await;
+            let gpu_renderer = FogRendererGpuNative::new(width, height).await;
             Ok(Self { 
                 renderer,
                 gpu_renderer
