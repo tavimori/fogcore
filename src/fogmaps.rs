@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 
 const FILENAME_MASK1: &str = "olhwjsktri";
+#[allow(dead_code)]
 const FILENAME_MASK2: &str = "eizxdwknmo";
 
 const MAP_WIDTH_OFFSET: i16 = 9;

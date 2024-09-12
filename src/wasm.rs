@@ -1,6 +1,6 @@
 use crate::fogmaps::FogMap as FogMapNative;
 use crate::renderer::FogRenderer as FogRendererNative;
-use crate::gpu::GpuFogRenderer as GpuFogRendererNative;
+use crate::renderer_gpu::GpuFogRenderer as GpuFogRendererNative;
 use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;

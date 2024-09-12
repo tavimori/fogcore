@@ -14,7 +14,7 @@ pub mod wasm;
 
 mod logging;
 
-mod gpu;
+mod renderer_gpu;
 
 pub use fogmaps::FogMap;
 pub use renderer::FogRenderer;

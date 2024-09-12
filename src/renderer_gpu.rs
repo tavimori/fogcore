@@ -6,6 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
 
+// #[allow(dead_code)]
 pub struct GpuFogRenderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -46,7 +47,8 @@ impl GpuFogRenderer {
                     label: None,
                     memory_hints: Default::default(),
                 },
-                None,
+                // None,
+                Some(&std::path::Path::new("trace")),
             )
             .await
             .unwrap();
@@ -188,14 +190,16 @@ impl GpuFogRenderer {
 
         let staging_buffer_arc2 = staging_buffer_arc.clone();
         let buffer_slice = staging_buffer_arc2.slice(..);
+        
+        log_print!("buffer_slice created");
 
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = tx.send(result);
         });
 
         spawn_local(async move {
-            let _ = rx.recv();
+            let _ = rx.await.unwrap();
             let buffer_slice3 = staging_buffer_arc2.slice(..);
             
             // Handle the mapped data here
@@ -203,5 +207,7 @@ impl GpuFogRenderer {
             log_print!("mapped data is of length: {}", mapped_range.len());
             callback(mapped_range.to_vec());
         });
+
+        log_print!("process_frame finished");
     }
 }
