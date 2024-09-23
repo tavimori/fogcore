@@ -74,6 +74,16 @@ impl FogRenderer {
     }
 
     #[wasm_bindgen]
+    pub fn render_image_raw(&self, fogmap: &FogMap, view_x: i64, view_y: i64, zoom: i16) -> Vec<u8> {
+        let fogmap_native_ref = fogmap.get_native_fogmap_ref();
+        let image = self
+            .render
+            .render_pixmap(fogmap_native_ref, view_x, view_y, zoom);
+        let data = image.data().to_vec();
+        data
+    }
+
+    #[wasm_bindgen]
     pub fn render_and_blur_image(&self, fogmap: &FogMap, view_x: i64, view_y: i64, zoom: i16) -> Vec<u8> {
         let fogmap_native_ref = fogmap.get_native_fogmap_ref();
         let mut pixmap = self

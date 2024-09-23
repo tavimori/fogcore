@@ -13,9 +13,11 @@
 </head>
 <body>
     <div id="map"></div>
-    <script>
+    <script type="module">
+        import { initializeWorker } from './wms-worker.js';
+
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('wms-worker.js')
+            initializeWorker()
                 .then(registration => console.log('ServiceWorker registration successful'))
                 .catch(error => console.log('ServiceWorker registration failed:', error));
         }
