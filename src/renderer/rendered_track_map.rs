@@ -35,6 +35,7 @@ pub struct BBox {
     pub north_east: Point,
 }
 
+#[allow(dead_code)]
 pub struct RenderedTrackMap {
     use_gpu: bool,
     track_map: FogMap,
@@ -43,6 +44,7 @@ pub struct RenderedTrackMap {
     current_render_area: Option<RenderArea>,
 }
 
+#[allow(dead_code)]
 impl RenderedTrackMap {
     pub fn new() -> Self {
         let track_map = FogMap::new();
