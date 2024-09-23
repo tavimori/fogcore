@@ -36,7 +36,8 @@ jobs:
     - name: Build and move wasm package
       run: | 
         wasm-pack build --target web --features wasm
-        mv ./pkg ./target/doc/
+        mkdir -p ./target/doc/pkg
+        cp -R ./pkg/* ./target/doc/pkg/
 
     - name: Create demo folder and move static files
       run: |
