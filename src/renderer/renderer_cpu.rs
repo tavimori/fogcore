@@ -27,12 +27,12 @@ impl FogRenderer {
         }
     }
 
-    pub fn set_fg_color(&mut self, color: tiny_skia::Color) {
-        self.fg_color_prgba = color.to_color_u8().premultiply();
+    pub fn set_fg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
+        self.fg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
     }
 
-    pub fn set_bg_color(&mut self, color: tiny_skia::Color) {
-        self.bg_color_prgba = color.to_color_u8().premultiply();
+    pub fn set_bg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
+        self.bg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
     }
 
     pub fn set_tile_size_power(&mut self, power: i16) {

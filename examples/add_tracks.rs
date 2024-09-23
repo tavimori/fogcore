@@ -24,8 +24,8 @@ fn main() {
     // fogmap.add_fow_file("33c1lljorhmz", content);
 
     let mut renderer = FogRenderer::new();
-    renderer.set_bg_color(tiny_skia::Color::BLACK);
-    renderer.set_fg_color(tiny_skia::Color::WHITE);
+    renderer.set_bg_color(100, 0, 100, 255);
+    renderer.set_fg_color(0, 0, 0, 0);
 
     // pkx
     let pkx_lng = 116.4233640802707;

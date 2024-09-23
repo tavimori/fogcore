@@ -43,10 +43,13 @@ fn main() {
         panic!("Failed to read directory: {:?}", tiles_dir);
     }
 
-    let renderer = FogRenderer::new();
+    let mut renderer = FogRenderer::new();
+    renderer.set_bg_color(100, 0, 100, 255);
+    renderer.set_fg_color(0, 0, 0, 0);
 
     // Define cities
     let cities = vec![
+        City { name: "gba", lng: 113.6, lat: 22.7, zoom: 7 },
         City { name: "shenzhen", lng: 114.1, lat: 22.7, zoom: 9 },
         City { name: "athens", lng: 23.7, lat: 37.9, zoom: 9 },
         // City { name: "new_york", lng: -74.0, lat: 40.7, zoom: 9 },
