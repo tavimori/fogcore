@@ -30,6 +30,14 @@ jobs:
     - name: Build Documentation
       run: cargo doc --all --no-deps
 
+    - name: Install wasm-pack
+      run: cargo install wasm-pack
+
+    - name: Build and move wasm package
+      run: | 
+        wasm-pack build --target web --features wasm
+        mv ./pkg ./target/doc/
+
     - name: Create demo folder and move static files
       run: |
         mkdir -p ./target/doc/demo
