@@ -182,7 +182,7 @@ impl GpuFogRenderer {
         log(&format!("passing gpu image length: {}", image_pix.data().len()));
 
         let closure = move |v: Vec<u8>| {
-            log_print!("From closure of lenght {}", v.len());
+            log_print!("From closure of length {}", v.len());
 
             // FIXME: this is a hack to make the image the correct size
             let img = Pixmap::from_vec(

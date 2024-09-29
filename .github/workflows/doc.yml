@@ -35,7 +35,7 @@ jobs:
 
     - name: Build and move wasm package
       run: | 
-        wasm-pack build --target web --features wasm
+        wasm-pack build --target web --features wasm --no-default-features
         mkdir -p ./target/doc/pkg
         cp -R ./pkg/* ./target/doc/pkg/
 

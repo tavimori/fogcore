@@ -2,6 +2,11 @@ use std::f64::consts::PI;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+use crate::FogMap;
+use std::path::Path;
+use std::fs::{self, File};
+use std::io::Read;
+
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -34,4 +39,37 @@ pub fn tile_x_y_to_lng_lat(x: i32, y: i32, zoom: i32) -> (f64, f64) {
     let lng = (x as f64 / n) * 360.0 - 180.0;
     let lat = (f64::atan(f64::sinh(PI * (1.0 - (2.0 * y as f64) / n))) * 180.0) / PI;
     (lng, lat)
+}
+
+
+pub fn load_tracks_map_folder(tiles_dir: &str) -> FogMap {
+    let mut fogmap = FogMap::new();
+    let tiles_dir = Path::new(tiles_dir);
+
+    // Load tiles
+    if let Ok(entries) = fs::read_dir(tiles_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        // Skip hidden files (those starting with a dot)
+                        if file_name.starts_with('.') {
+                            continue;
+                        }
+
+                        let mut tile_file = File::open(&path).unwrap();
+                        let mut content = Vec::new();
+                        tile_file.read_to_end(&mut content).unwrap();
+                        println!("Loading file: {} with length: {}", file_name, content.len());
+                        fogmap.add_fow_file(file_name, content);
+                    }
+                }
+            }
+        }
+    } else {
+        panic!("Failed to read directory: {:?}", tiles_dir);
+    }
+
+    fogmap
 }

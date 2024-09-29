@@ -1,9 +1,37 @@
 use crate::renderer::renderer_cpu::FogRenderer;
+use crate::renderer::renderer_gpu::FogRendererGpu;
 use crate::utils;
 use crate::FogMap;
 use std::convert::TryInto;
 use tiny_skia;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
+
+use tokio::runtime::Runtime;
+use tiny_skia::IntSize;
+
+pub enum TileSize {
+    TileSize256,
+    TileSize512,
+    TileSize1024,
+}
+
+impl TileSize {
+    pub fn size(&self) -> u32 {
+        match self {
+            TileSize::TileSize256 => 256,
+            TileSize::TileSize512 => 512,
+            TileSize::TileSize1024 => 1024,
+        }
+    }
+
+    pub fn power(&self) -> i16 {
+        match self {
+            TileSize::TileSize256 => 8,
+            TileSize::TileSize512 => 9,
+            TileSize::TileSize1024 => 10,
+        }
+    }
+}
 
 pub struct RenderResult {
     // coordinates are in lat or lng
@@ -25,11 +53,13 @@ struct RenderArea {
     bottom_idx: i32,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Point {
     pub lng: f64,
     pub lat: f64,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct BBox {
     pub south_west: Point,
     pub north_east: Point,
@@ -37,11 +67,12 @@ pub struct BBox {
 
 #[allow(dead_code)]
 pub struct RenderedTrackMap {
-    use_gpu: bool,
     track_map: FogMap,
     bg_color_prgba: tiny_skia::PremultipliedColorU8,
     fg_color_prgba: tiny_skia::PremultipliedColorU8,
     current_render_area: Option<RenderArea>,
+    tile_size: TileSize,
+    gpu_worker: Option<FogRendererGpu>,
 }
 
 #[allow(dead_code)]
@@ -58,24 +89,54 @@ impl RenderedTrackMap {
         let fg_color_prgba = tiny_skia::PremultipliedColorU8::TRANSPARENT;
 
         Self {
-            use_gpu: false,
             track_map,
             bg_color_prgba,
             fg_color_prgba,
             current_render_area: None,
+            tile_size: TileSize::TileSize512,
+            gpu_worker: None,
         }
     }
 
     pub fn set_fg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
         self.fg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
-        // TODO: clear buffer
+        self.clear_buffer();
     }
 
     pub fn set_bg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
         self.bg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
-        // TODO: clear buffer
+        self.clear_buffer();
     }
 
+    pub fn set_tile_size(&mut self, tile_size: TileSize) {
+        self.tile_size = tile_size;
+        self.clear_buffer();
+        // if gpu is used, we need to re-create the gpu worker
+        if let Some(_) = &self.gpu_worker {
+            self.set_use_gpu(true);
+        }
+    }
+
+    pub fn set_use_gpu(&mut self, use_gpu: bool) {
+        let tile_size = self.tile_size.size();
+        if use_gpu {
+            let gpu_worker = Runtime::new().unwrap().block_on(async move {
+                FogRendererGpu::new(tile_size, tile_size).await
+            });
+            self.gpu_worker = Some(gpu_worker);
+        } else {
+            self.gpu_worker = None;
+        }
+        self.clear_buffer();
+    }
+
+    pub fn clear_buffer(&mut self) {
+        self.current_render_area = None;
+    }
+
+    /// render a rectangle area of (multiple) map tiles. used for onetime rendering of the map on some divices. 
+    /// The area is usually larger than the display area to prevent flashing during 
+    /// zooming and panning.
     fn render_region_containing_bbox(&self, render_area: &RenderArea) -> RenderResult {
         // TODO: Change render backend. Right now we are using `tiny-skia`,
         // it should work just fine and we don't really need fancy features.
@@ -100,10 +161,9 @@ impl RenderedTrackMap {
             self.bg_color_prgba.demultiply().alpha(),
         );
 
-        // TODO: design this interface?
-        const TILE_SIZE_POWER: i16 = 10;
+        tile_renderer.set_tile_size_power(self.tile_size.power());
+        let tile_size: u32 = self.tile_size.size();
 
-        let tile_size: u32 = 1 << TILE_SIZE_POWER;
         let width_by_tile: u32 = (render_area.right_idx - render_area.left_idx + 1)
             .try_into()
             .unwrap();
@@ -127,10 +187,30 @@ impl RenderedTrackMap {
                     render_area.zoom as i16,
                 );
 
+                debug_assert_eq!(tile_pixmap.width(), tile_size);
+                debug_assert_eq!(tile_pixmap.height(), tile_size);
+
+                println!("processing tile pixmap`");
+
+                let processed_tile_pixmap_data = {
+                    if let Some(gpu_worker) = &self.gpu_worker {
+                        let rt = Runtime::new().unwrap();
+                        rt.block_on(gpu_worker.process_frame_async(tile_pixmap.data()))
+                    } else {
+                        tile_pixmap.data().to_vec()
+                    }
+                };
+
+                // println!("output_image_data length: {}", output_image_data.len());  
+                let processed_tile_pixmap = Pixmap::from_vec(
+                    processed_tile_pixmap_data, 
+                    IntSize::from_wh(1024,1024).unwrap()
+                ).unwrap();
+
                 pixmap.draw_pixmap(
                     (x * tile_size) as i32,
                     (y * tile_size) as i32,
-                    tile_pixmap.as_ref(),
+                    processed_tile_pixmap.as_ref(),
                     &PixmapPaint::default(),
                     Transform::identity(),
                     None,
@@ -158,7 +238,12 @@ impl RenderedTrackMap {
         }
     }
 
-    fn try_render_region_containing_bbox(&mut self, bbox: BBox, zoom: i32) -> Option<RenderResult> {
+    /// Render a region containing a bounding box.
+    pub fn try_render_region_containing_bbox(
+        &mut self,
+        bbox: BBox,
+        zoom: i32,
+    ) -> Option<RenderResult> {
         // TODO: This doesn't really work when antimeridian is involved, see
         // the upstream issue: https://github.com/maplibre/maplibre-native/issues/1681
         let mut left_idx = utils::lng_to_tile_x(bbox.south_west.lng, zoom as i16) as i32;

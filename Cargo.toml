@@ -8,8 +8,9 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook"]
-wasm = ["wasm-bindgen", "js-sys"]
+default = [ "native" ]
+native = [ "tokio/rt-multi-thread" ]
+wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 
 [dependencies]
@@ -26,13 +27,15 @@ miniz_oxide = "0.7.1"
 wgpu = "22.1.0"
 bytemuck = "1.17.0"
 wasm-bindgen-futures = "0.4.43"
-tokio = { version =  "1.40.0", features = ["rt", "sync"] }
+tokio = { version = "1.40.0", features = ["rt", "sync"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
+serde_json = "1.0"
+sha2 = "0.10"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
