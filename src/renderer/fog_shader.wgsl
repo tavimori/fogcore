@@ -30,13 +30,15 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = global_id.x;
     let y = global_id.y;
 
+    let self_idx = y * width + x;
+
     // TODO: a better way to handle border pixels
     // Skip border pixels
     if (x < 2u || x >= width - 2u || y < 2u || y >= height - 2u) {
+        output[self_idx] = input[self_idx];
         return;
     }
 
-    let self_idx = y * width + x;
     let self_alpha = f32(input[self_idx] >> 24u) / 255.0;
     var min_alpha = 1.0;
     var max_r = 0u;
