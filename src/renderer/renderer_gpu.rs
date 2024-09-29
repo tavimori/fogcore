@@ -37,8 +37,22 @@ impl FogRendererGpu {
                 compatible_surface: None,
                 force_fallback_adapter: false,
             })
-            .await
-            .unwrap();
+            .await;
+
+        let adapter = match adapter {
+            Some(adapter) => adapter,
+            None => {
+                // If no adapter is found, try again with force_fallback_adapter set to true
+                instance
+                    .request_adapter(&wgpu::RequestAdapterOptions {
+                        power_preference: wgpu::PowerPreference::LowPower,
+                        compatible_surface: None,
+                        force_fallback_adapter: true,
+                    })
+                    .await
+                    .expect("Failed to find an appropriate adapter")
+            }
+        };
 
         log_print!("Adapter created: {:?}", adapter.get_info());
 
