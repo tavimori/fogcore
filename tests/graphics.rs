@@ -110,22 +110,36 @@ fn test_different_size_rendering() {
         north_east: Point { lng: 114.343, lat: 22.769 },
     };
 
-    // rendered_map.set_tile_size(TileSize::TileSize256);
-    // let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
-    // let composed_png = generate_composed_image_with_white_background(&result.data);
-    // verify_image("test_different_size_rendering_shenzhen_256", &composed_png);
+    rendered_map.set_tile_size(TileSize::TileSize256);
+    let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256", &composed_png);
 
-    // rendered_map.set_tile_size(TileSize::TileSize512);
-    // let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
-    // let composed_png = generate_composed_image_with_white_background(&result.data);
-    // verify_image("test_different_size_rendering_shenzhen_512", &composed_png);
-
-
-    // GPU rendering
-    rendered_map.set_use_gpu(true);
+    rendered_map.set_tile_size(TileSize::TileSize512);
+    let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512", &composed_png);
 
     rendered_map.set_tile_size(TileSize::TileSize1024);
     let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
     let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("test_different_size_rendering_shenzhen_1024", &composed_png);
+    verify_image("different_size_rendering_shenzhen_1024", &composed_png);
+
+    // GPU rendering with high-DPI
+    rendered_map.set_use_gpu(true);
+
+    rendered_map.set_tile_size(TileSize::TileSize256);
+    let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_png);
+
+    rendered_map.set_tile_size(TileSize::TileSize512);
+    let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_png);
+
+    rendered_map.set_tile_size(TileSize::TileSize1024);
+    let result = rendered_map.try_render_region_containing_bbox(bbox, 9).unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_1024_hidpi", &composed_png);
 }

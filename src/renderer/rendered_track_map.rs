@@ -6,8 +6,8 @@ use std::convert::TryInto;
 use tiny_skia;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
 
-use tokio::runtime::Runtime;
 use tiny_skia::IntSize;
+use tokio::runtime::Runtime;
 
 pub enum TileSize {
     TileSize256,
@@ -120,9 +120,9 @@ impl RenderedTrackMap {
     pub fn set_use_gpu(&mut self, use_gpu: bool) {
         let tile_size = self.tile_size.size();
         if use_gpu {
-            let gpu_worker = Runtime::new().unwrap().block_on(async move {
-                FogRendererGpu::new(tile_size, tile_size).await
-            });
+            let gpu_worker = Runtime::new()
+                .unwrap()
+                .block_on(async move { FogRendererGpu::new(tile_size, tile_size).await });
             self.gpu_worker = Some(gpu_worker);
         } else {
             self.gpu_worker = None;
@@ -134,8 +134,8 @@ impl RenderedTrackMap {
         self.current_render_area = None;
     }
 
-    /// render a rectangle area of (multiple) map tiles. used for onetime rendering of the map on some divices. 
-    /// The area is usually larger than the display area to prevent flashing during 
+    /// render a rectangle area of (multiple) map tiles. used for onetime rendering of the map on some divices.
+    /// The area is usually larger than the display area to prevent flashing during
     /// zooming and panning.
     fn render_region_containing_bbox(&self, render_area: &RenderArea) -> RenderResult {
         // TODO: Change render backend. Right now we are using `tiny-skia`,
@@ -201,11 +201,12 @@ impl RenderedTrackMap {
                     }
                 };
 
-                // println!("output_image_data length: {}", output_image_data.len());  
+                // println!("output_image_data length: {}", output_image_data.len());
                 let processed_tile_pixmap = Pixmap::from_vec(
-                    processed_tile_pixmap_data, 
-                    IntSize::from_wh(1024,1024).unwrap()
-                ).unwrap();
+                    processed_tile_pixmap_data,
+                    IntSize::from_wh(tile_size, tile_size).unwrap(),
+                )
+                .unwrap();
 
                 pixmap.draw_pixmap(
                     (x * tile_size) as i32,

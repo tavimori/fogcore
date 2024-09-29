@@ -4,6 +4,9 @@ var<storage, read> input: array<u32>;
 @group(0) @binding(1)
 var<storage, read_write> output: array<u32>;
 
+@group(0) @binding(2)
+var<uniform> dimensions: vec2<u32>;
+
 const KERNEL_SIZE: u32 = 5;
 
 // const KERNEL: array<array<f32, 5>, 5> = array<array<f32, 5>, 5>(
@@ -25,8 +28,9 @@ fn get_kernel_weight(ky: u32, kx: u32) -> f32 {
 
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let width = 1024u;  // Assuming width is 1024, adjust as needed
-    let height = 1024u; // Assuming height is 1024, adjust as needed
+    let width = dimensions.x;
+    let height = dimensions.y;
+
     let x = global_id.x;
     let y = global_id.y;
 
@@ -38,6 +42,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         output[self_idx] = input[self_idx];
         return;
     }
+
 
     let self_alpha = f32(input[self_idx] >> 24u) / 255.0;
     var min_alpha = 1.0;

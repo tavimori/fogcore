@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = [ "native" ]
-native = [ "tokio/rt-multi-thread" ]
+native = [ "tokio/rt-multi-thread", "tokio/macros" ]
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 
@@ -28,6 +28,7 @@ wgpu = "22.1.0"
 bytemuck = "1.17.0"
 wasm-bindgen-futures = "0.4.43"
 tokio = { version = "1.40.0", features = ["rt", "sync"] }
+tokio-macros = "2.4.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }

@@ -16,6 +16,7 @@ pub struct FogRendererGpu {
     bind_group: BindGroup,
     input_buffer: Buffer,
     output_buffer: Buffer,
+    dimensions_buffer: Buffer,
     width: u32,
     height: u32,
     // renderer: FogRendererNative,
@@ -80,6 +81,13 @@ impl FogRendererGpu {
             mapped_at_creation: false,
         });
 
+        let dimensions_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Dimensions Buffer"),
+            size: std::mem::size_of::<[u32; 2]>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
@@ -102,6 +110,16 @@ impl FogRendererGpu {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
             ],
             label: Some("Bind Group Layout"),
         });
@@ -116,6 +134,10 @@ impl FogRendererGpu {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: output_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: dimensions_buffer.as_entire_binding(),
                 },
             ],
             label: Some("Bind Group"),
@@ -136,6 +158,8 @@ impl FogRendererGpu {
             compilation_options: Default::default(),
         });
 
+        
+
         Self {
             device,
             queue,
@@ -143,6 +167,7 @@ impl FogRendererGpu {
             bind_group,
             input_buffer,
             output_buffer,
+            dimensions_buffer,
             width,
             height,
         }
@@ -150,6 +175,7 @@ impl FogRendererGpu {
 
     pub async fn process_frame_async(&self, input: &[u8]) -> Vec<u8> {
         log_print!("Starting process_frame, input length: {}", input.len());
+        self.queue.write_buffer(&self.dimensions_buffer, 0, bytemuck::cast_slice(&[self.width, self.height]));
         self.queue.write_buffer(&self.input_buffer, 0, input);
         log_print!("Input buffer written");
 
@@ -213,6 +239,7 @@ impl FogRendererGpu {
 
     pub fn process_frame(&self, input: &[u8], callback: Box<dyn Fn(Vec<u8>)>) {
         log_print!("Starting process_frame, input length: {}", input.len());
+        self.queue.write_buffer(&self.dimensions_buffer, 0, bytemuck::cast_slice(&[self.width, self.height]));
         self.queue.write_buffer(&self.input_buffer, 0, input);
         log_print!("Input buffer written");
 
