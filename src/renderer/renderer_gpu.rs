@@ -1,14 +1,12 @@
-use wgpu::{self, Device, Queue, Buffer, BindGroup, ComputePipeline};
-use std::sync::Arc;
 use crate::log_print;
-use wasm_bindgen_futures::spawn_local;
-use tokio::task;
+use std::sync::Arc;
 use tokio::sync::oneshot;
-
+use tokio::task;
+use wasm_bindgen_futures::spawn_local;
+use wgpu::{self, BindGroup, Buffer, ComputePipeline, Device, Queue};
 
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
 
-// #[allow(dead_code)]
 pub struct FogRendererGpu {
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -19,7 +17,6 @@ pub struct FogRendererGpu {
     dimensions_buffer: Buffer,
     width: u32,
     height: u32,
-    // renderer: FogRendererNative,
 }
 
 impl FogRendererGpu {
@@ -70,7 +67,11 @@ impl FogRendererGpu {
             .await
             .unwrap();
 
-        log_print!("Device created: {:?}, {:?}", device.features(), device.limits());
+        log_print!(
+            "Device created: {:?}, {:?}",
+            device.features(),
+            device.limits()
+        );
 
         let device = Arc::new(device);
         let queue = Arc::new(queue);
@@ -133,7 +134,7 @@ impl FogRendererGpu {
                         min_binding_size: None,
                     },
                     count: None,
-                }
+                },
             ],
             label: Some("Bind Group Layout"),
         });
@@ -172,8 +173,6 @@ impl FogRendererGpu {
             compilation_options: Default::default(),
         });
 
-        
-
         Self {
             device,
             queue,
@@ -189,13 +188,19 @@ impl FogRendererGpu {
 
     pub async fn process_frame_async(&self, input: &[u8]) -> Vec<u8> {
         log_print!("Starting process_frame, input length: {}", input.len());
-        self.queue.write_buffer(&self.dimensions_buffer, 0, bytemuck::cast_slice(&[self.width, self.height]));
+        self.queue.write_buffer(
+            &self.dimensions_buffer,
+            0,
+            bytemuck::cast_slice(&[self.width, self.height]),
+        );
         self.queue.write_buffer(&self.input_buffer, 0, input);
         log_print!("Input buffer written");
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Compute Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Compute Encoder"),
+            });
 
         {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -204,7 +209,11 @@ impl FogRendererGpu {
             });
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.bind_group, &[]);
-            compute_pass.dispatch_workgroups(self.width / WORKGROUP_SIZE.0, self.height / WORKGROUP_SIZE.1, 1);
+            compute_pass.dispatch_workgroups(
+                self.width / WORKGROUP_SIZE.0,
+                self.height / WORKGROUP_SIZE.1,
+                1,
+            );
         }
         log_print!("Compute pass encoded");
 
@@ -229,10 +238,9 @@ impl FogRendererGpu {
         self.queue.submit(Some(encoder.finish()));
         log_print!("Commands submitted");
 
-
         let staging_buffer_arc2 = staging_buffer_arc.clone();
         let buffer_slice = staging_buffer_arc2.slice(..);
-        
+
         log_print!("buffer_slice created");
 
         let (tx, rx) = oneshot::channel();
@@ -244,7 +252,7 @@ impl FogRendererGpu {
         self.device.poll(wgpu::Maintain::Wait);
         let _ = rx.await.unwrap();
         let buffer_slice3 = staging_buffer_arc2.slice(..);
-        
+
         let mapped_range = buffer_slice3.get_mapped_range();
         // callback(mapped_range.to_vec());
         println!("mapped_range length: {}", mapped_range.len());
@@ -253,13 +261,19 @@ impl FogRendererGpu {
 
     pub fn process_frame(&self, input: &[u8], callback: Box<dyn Fn(Vec<u8>)>) {
         log_print!("Starting process_frame, input length: {}", input.len());
-        self.queue.write_buffer(&self.dimensions_buffer, 0, bytemuck::cast_slice(&[self.width, self.height]));
+        self.queue.write_buffer(
+            &self.dimensions_buffer,
+            0,
+            bytemuck::cast_slice(&[self.width, self.height]),
+        );
         self.queue.write_buffer(&self.input_buffer, 0, input);
         log_print!("Input buffer written");
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Compute Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Compute Encoder"),
+            });
 
         {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -268,7 +282,11 @@ impl FogRendererGpu {
             });
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.bind_group, &[]);
-            compute_pass.dispatch_workgroups(self.width / WORKGROUP_SIZE.0, self.height / WORKGROUP_SIZE.1, 1);
+            compute_pass.dispatch_workgroups(
+                self.width / WORKGROUP_SIZE.0,
+                self.height / WORKGROUP_SIZE.1,
+                1,
+            );
         }
         log_print!("Compute pass encoded");
 
@@ -293,10 +311,9 @@ impl FogRendererGpu {
         self.queue.submit(Some(encoder.finish()));
         log_print!("Commands submitted");
 
-
         let staging_buffer_arc2 = staging_buffer_arc.clone();
         let buffer_slice = staging_buffer_arc2.slice(..);
-        
+
         log_print!("buffer_slice created");
 
         let (tx, rx) = oneshot::channel();
@@ -304,25 +321,23 @@ impl FogRendererGpu {
             let _ = tx.send(result);
         });
 
-
         // task::spawn_local(async move {
         //     let _ = rx.await.unwrap();
         //     let buffer_slice3 = staging_buffer_arc2.slice(..);
-            
+
         //     // Handle the mapped data here
         //     let mapped_range = buffer_slice3.get_mapped_range();
         //     log_print!("mapped data is of length: {}", mapped_range.len());
         //     callback(mapped_range.to_vec());
         // });
 
-
-        // if target is wasm, then we need to use spawn_local   
+        // if target is wasm, then we need to use spawn_local
         // if target is native, then we need to use task::spawn_local
         if cfg!(target_arch = "wasm32") {
             spawn_local(async move {
                 let _ = rx.await.unwrap();
                 let buffer_slice3 = staging_buffer_arc2.slice(..);
-                
+
                 let mapped_range = buffer_slice3.get_mapped_range();
                 callback(mapped_range.to_vec());
             });
@@ -330,7 +345,7 @@ impl FogRendererGpu {
             task::spawn_local(async move {
                 let _ = rx.await.unwrap();
                 let buffer_slice3 = staging_buffer_arc2.slice(..);
-                
+
                 let mapped_range = buffer_slice3.get_mapped_range();
                 callback(mapped_range.to_vec());
             });

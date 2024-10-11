@@ -7,6 +7,9 @@ use std::path::Path;
 use std::fs::{self, File};
 use std::io::Read;
 
+pub const DEFAULT_BG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 128);
+pub const DEFAULT_FG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 0);
+
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then

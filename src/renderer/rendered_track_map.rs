@@ -1,5 +1,5 @@
-use crate::renderer::renderer_cpu::FogRenderer;
 use crate::renderer::renderer_gpu::FogRendererGpu;
+use crate::renderer::tile_shader::TileShader;
 use crate::utils;
 use crate::FogMap;
 use std::convert::TryInto;
@@ -146,22 +146,6 @@ impl RenderedTrackMap {
         // now is that it is pure rust, so we don't need to think about how to build depenceies
         // for various platform.
 
-        // TODO: make tile renderer static
-        let mut tile_renderer = FogRenderer::new();
-        tile_renderer.set_fg_color(
-            self.fg_color_prgba.demultiply().red(),
-            self.fg_color_prgba.demultiply().green(),
-            self.fg_color_prgba.demultiply().blue(),
-            self.fg_color_prgba.demultiply().alpha(),
-        );
-        tile_renderer.set_bg_color(
-            self.bg_color_prgba.demultiply().red(),
-            self.bg_color_prgba.demultiply().green(),
-            self.bg_color_prgba.demultiply().blue(),
-            self.bg_color_prgba.demultiply().alpha(),
-        );
-
-        tile_renderer.set_tile_size_power(self.tile_size.power());
         let tile_size: u32 = self.tile_size.size();
 
         let width_by_tile: u32 = (render_area.right_idx - render_area.left_idx + 1)
@@ -180,11 +164,14 @@ impl RenderedTrackMap {
             for y in 0..height_by_tile {
                 // TODO: cache?
 
-                let tile_pixmap = tile_renderer.render_pixmap(
+                let tile_pixmap = TileShader::render_pixmap(
                     &self.track_map,
                     render_area.left_idx as i64 + x as i64,
                     render_area.top_idx as i64 + y as i64,
                     render_area.zoom as i16,
+                    self.tile_size.power(),
+                    self.bg_color_prgba.demultiply(),
+                    self.fg_color_prgba.demultiply(),
                 );
 
                 debug_assert_eq!(tile_pixmap.width(), tile_size);
