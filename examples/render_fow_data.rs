@@ -1,4 +1,4 @@
-use fogcore::{FogMap, FogRenderer};
+use fogcore::{FogMap, TileShader, DEFAULT_VIEW_SIZE_POWER};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Read;
@@ -21,9 +21,9 @@ fn main() {
     println!("loading a file with len{}.", content.len());
     fogmap.add_fow_file("0921iihwtxn", content);
 
-    let mut renderer = FogRenderer::new();
-    renderer.set_bg_color(100, 0, 100, 255);
-    renderer.set_fg_color(0, 0, 0, 0);
+    let bg_color = tiny_skia::ColorU8::from_rgba(100, 0, 100, 255);
+    let fg_color = tiny_skia::ColorU8::from_rgba(0, 0, 0, 0);
+
 
     // The Palace Museum
     let lng = 116.39290;
@@ -34,7 +34,7 @@ fn main() {
         let (x, y) = lng_lat_to_tile_x_y(lng, lat, zoom);
 
         println!("draw x: {}, y: {}, zoom: {}", x, y, zoom);
-        let pixmap = renderer.render_pixmap(&fogmap, x, y, zoom);
+        let pixmap = TileShader::render_pixmap(&fogmap, x, y, zoom, DEFAULT_VIEW_SIZE_POWER, bg_color, fg_color);
         pixmap.save_png(format!("image{}.png", zoom)).unwrap();
     }
 }

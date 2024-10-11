@@ -102,7 +102,6 @@ impl TileShader {
     }
 
     fn render_tile_on_pixels(
-        // &self,
         tile: &Tile,
         pixels: &mut [tiny_skia::PremultipliedColorU8],
         start_x: i64,
@@ -183,7 +182,6 @@ impl TileShader {
     }
 
     fn render_block_on_pixels(
-        // &self,
         block: &Block,
         pixels: &mut [tiny_skia::PremultipliedColorU8],
         start_x: i64,
@@ -242,7 +240,6 @@ impl TileShader {
     }
 
     fn draw_pixel(
-        // &self, 
         pixels: &mut [tiny_skia::PremultipliedColorU8], 
         x: i64, 
         y: i64, 

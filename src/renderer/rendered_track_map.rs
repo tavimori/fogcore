@@ -1,6 +1,7 @@
 use crate::renderer::renderer_gpu::FogRendererGpu;
 use crate::renderer::tile_shader::TileShader;
 use crate::utils;
+use crate::utils::{DEFAULT_BG_COLOR, DEFAULT_FG_COLOR};
 use crate::FogMap;
 use std::convert::TryInto;
 use tiny_skia;
@@ -68,8 +69,8 @@ pub struct BBox {
 #[allow(dead_code)]
 pub struct RenderedTrackMap {
     track_map: FogMap,
-    bg_color_prgba: tiny_skia::PremultipliedColorU8,
-    fg_color_prgba: tiny_skia::PremultipliedColorU8,
+    bg_color: tiny_skia::ColorU8,
+    fg_color: tiny_skia::ColorU8,
     current_render_area: Option<RenderArea>,
     tile_size: TileSize,
     gpu_worker: Option<FogRendererGpu>,
@@ -83,15 +84,10 @@ impl RenderedTrackMap {
     }
 
     pub fn new_with_track_map(track_map: FogMap) -> Self {
-        let opacity = 0.5;
-        let alpha = (opacity * 255.0) as u8;
-        let bg_color_prgba = tiny_skia::PremultipliedColorU8::from_rgba(0, 0, 0, alpha).unwrap();
-        let fg_color_prgba = tiny_skia::PremultipliedColorU8::TRANSPARENT;
-
         Self {
             track_map,
-            bg_color_prgba,
-            fg_color_prgba,
+            bg_color: DEFAULT_BG_COLOR,
+            fg_color: DEFAULT_FG_COLOR,
             current_render_area: None,
             tile_size: TileSize::TileSize512,
             gpu_worker: None,
@@ -99,12 +95,12 @@ impl RenderedTrackMap {
     }
 
     pub fn set_fg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
-        self.fg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
+        self.fg_color = tiny_skia::ColorU8::from_rgba(r, g, b, a);
         self.clear_buffer();
     }
 
     pub fn set_bg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
-        self.bg_color_prgba = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
+        self.bg_color = tiny_skia::ColorU8::from_rgba(r, g, b, a);
         self.clear_buffer();
     }
 
@@ -170,8 +166,8 @@ impl RenderedTrackMap {
                     render_area.top_idx as i64 + y as i64,
                     render_area.zoom as i16,
                     self.tile_size.power(),
-                    self.bg_color_prgba.demultiply(),
-                    self.fg_color_prgba.demultiply(),
+                    self.bg_color,
+                    self.fg_color,
                 );
 
                 debug_assert_eq!(tile_pixmap.width(), tile_size);
