@@ -8,8 +8,9 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = [ "native" ]
+default = [ "native", "premium" ]
 native = [ "tokio/rt-multi-thread", "tokio/macros" ]
+premium = []
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 
@@ -36,9 +37,14 @@ web-sys = { version = "0.3", features = ["console"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
+criterion = { version = "0.5", features = ["html_reports"] }
 serde_json = "1.0"
 sha2 = "0.10"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
