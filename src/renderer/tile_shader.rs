@@ -1,13 +1,12 @@
 use crate::fogmaps::{Block, Tile};
 use crate::fogmaps::{BITMAP_WIDTH, BITMAP_WIDTH_OFFSET, TILE_WIDTH_OFFSET};
 use crate::FogMap;
-use tiny_skia;
+use image::GenericImage;
+use image::Rgba;
+use image::RgbaImage;
+use image::SubImage;
 
 const FOW_TILE_ZOOM: i16 = 9;
-
-// TODO: deprecate the use of `tiny_skia`. `tiny_skia` uses premultiplied color, which does not suit with our use case.
-//  we don't do alpha blending in our codes and only output a png to the map sdk. Moreover, premultiplied color is not used 
-//  in GPU rendering.
 
 // we have 512*512 tiles, 128*128 blocks and a single block contains a 64*64 bitmap.
 pub struct TileShader;
@@ -23,22 +22,27 @@ impl TileShader {
     // TODO: may use mipmap to accelerate the rendering.
     // TODO: currently if a pixel contains multiple tile / block, the rendering process will write over the pixel multiple times, may use other interpolation method.
     // We use a method called max-pooling interpolation to enlarge the tracks while keeping them easy to see at different sizes.
-    pub fn render_pixmap(
+    pub fn render_on_image2(
+        image: &mut RgbaImage,
+        start_x: u32,
+        start_y: u32,
         fogmap: &FogMap,
         view_x: i64,
         view_y: i64,
         zoom: i16,
         buffer_size_power: i16,
-        bg_color: tiny_skia::ColorU8,
-        fg_color: tiny_skia::ColorU8,
-    ) -> tiny_skia::Pixmap {
+        bg_color: Rgba<u8>,
+        fg_color: Rgba<u8>,
+    ) {
         let width = 1 << buffer_size_power;
-        let mut pixmap = tiny_skia::Pixmap::new(width, width).unwrap();
-        let pixels = pixmap.pixels_mut();
+
+        let mut sub_image = GenericImage::sub_image(image, start_x, start_y, width, width);
 
         // draw background
-        for p in pixels.iter_mut() {
-            *p = bg_color.premultiply();
+        for y in 0..width {
+            for x in 0..width {
+                sub_image.put_pixel(x, y, bg_color);
+            }
         }
 
         // https://developers.google.com/maps/documentation/javascript/coordinates
@@ -85,7 +89,7 @@ impl TileShader {
                     };
                     Self::render_tile_on_pixels(
                         tile,
-                        pixels,
+                        &mut sub_image,
                         x0,
                         y0,
                         sub_tile_x_idx,
@@ -98,12 +102,11 @@ impl TileShader {
                 }
             }
         }
-        pixmap
     }
 
     fn render_tile_on_pixels(
         tile: &Tile,
-        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        sub_image: &mut SubImage<&mut RgbaImage>,
         start_x: i64,
         start_y: i64,
         sub_tile_x_idx: i64,
@@ -111,7 +114,7 @@ impl TileShader {
         zoom_factor: i16,
         size_power: i16,
         buffer_size_power: i16,
-        fg_color: tiny_skia::ColorU8,
+        fg_color: Rgba<u8>,
     ) {
         debug_assert!(
             zoom_factor >= 0,
@@ -128,7 +131,7 @@ impl TileShader {
 
         if size_power <= 0 {
             // the tile only occupies at most one pixel, so we don't have to access the blocks.
-            Self::draw_pixel(pixels, start_x, start_y, buffer_size_power, fg_color);
+            sub_image.put_pixel(start_x as u32, start_y as u32, fg_color);
         } else {
             // the tile occupies more than one pixel, currently all the blocks will be used to render。
 
@@ -165,14 +168,13 @@ impl TileShader {
                         };
                         Self::render_block_on_pixels(
                             block,
-                            pixels,
+                            sub_image,
                             start_x + offset_x,
                             start_y + offset_y,
                             sub_block_x_idx,
                             sub_block_y_idx,
                             block_zoom_factor,
                             std::cmp::min(block_width_power, buffer_size_power),
-                            buffer_size_power,
                             fg_color,
                         );
                     }
@@ -183,18 +185,17 @@ impl TileShader {
 
     fn render_block_on_pixels(
         block: &Block,
-        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        sub_image: &mut SubImage<&mut RgbaImage>,
         start_x: i64,
         start_y: i64,
         sub_block_x_idx: i64,
         sub_block_y_idx: i64,
         zoom_factor: i16,
         size_power: i16,
-        buffer_size_power: i16,
-        fg_color: tiny_skia::ColorU8,
+        fg_color: Rgba<u8>,
     ) {
         if size_power <= 0 {
-            Self::draw_pixel(pixels, start_x, start_y, buffer_size_power, fg_color);
+            sub_image.put_pixel(start_x as u32, start_y as u32, fg_color);
         } else {
             let dot_num_power = BITMAP_WIDTH_OFFSET - zoom_factor; // number of block in a row of the view
 
@@ -225,12 +226,11 @@ impl TileShader {
                             (i >> -block_dot_width_power, j >> -block_dot_width_power)
                         };
                         Self::draw_rect(
-                            pixels,
+                            sub_image,
                             start_x + offset_x,
                             start_y + offset_y,
                             block_dot_width,
                             block_dot_width,
-                            buffer_size_power,
                             fg_color,
                         );
                     }
@@ -239,31 +239,17 @@ impl TileShader {
         }
     }
 
-    fn draw_pixel(
-        pixels: &mut [tiny_skia::PremultipliedColorU8], 
-        x: i64, 
-        y: i64, 
-        buffer_size_power: i16,
-        fg_color: tiny_skia::ColorU8,
-    ) {
-        // according to tiny-skia docs, the pixel data is not aligned, therefore pixels can be accessed dirrecly by `pixels[x*width + y]`
-        let index = x + (y << buffer_size_power);
-        pixels[index as usize] = fg_color.premultiply();
-    }
-
     fn draw_rect(
-        // &self,
-        pixels: &mut [tiny_skia::PremultipliedColorU8],
+        sub_image: &mut SubImage<&mut RgbaImage>,
         x: i64,
         y: i64,
         w: i64,
         h: i64,
-        buffer_size_power: i16,
-        fg_color: tiny_skia::ColorU8,
+        fg_color: Rgba<u8>,
     ) {
         for i in x..(x + w) {
             for j in y..(y + h) {
-                Self::draw_pixel(pixels, i, j, buffer_size_power, fg_color);
+                sub_image.put_pixel(i as u32, j as u32, fg_color);
             }
         }
     }

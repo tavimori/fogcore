@@ -1,38 +1,11 @@
-use crate::renderer::renderer_gpu::FogRendererGpu;
-use crate::renderer::tile_shader::TileShader;
+use crate::renderer::TileRendererBasic;
+use crate::renderer::TileRendererTrait;
 use crate::utils;
-use crate::utils::{DEFAULT_BG_COLOR, DEFAULT_FG_COLOR};
+use crate::utils::{TileSize, DEFAULT_BG_COLOR2, DEFAULT_FG_COLOR2};
 use crate::FogMap;
+use image::Rgba;
+use image::RgbaImage;
 use std::convert::TryInto;
-use tiny_skia;
-use tiny_skia::{Pixmap, PixmapPaint, Transform};
-
-use tiny_skia::IntSize;
-use tokio::runtime::Runtime;
-
-pub enum TileSize {
-    TileSize256,
-    TileSize512,
-    TileSize1024,
-}
-
-impl TileSize {
-    pub fn size(&self) -> u32 {
-        match self {
-            TileSize::TileSize256 => 256,
-            TileSize::TileSize512 => 512,
-            TileSize::TileSize1024 => 1024,
-        }
-    }
-
-    pub fn power(&self) -> i16 {
-        match self {
-            TileSize::TileSize256 => 8,
-            TileSize::TileSize512 => 9,
-            TileSize::TileSize1024 => 10,
-        }
-    }
-}
 
 pub struct RenderResult {
     // coordinates are in lat or lng
@@ -66,17 +39,14 @@ pub struct BBox {
     pub north_east: Point,
 }
 
-#[allow(dead_code)]
 pub struct RenderedTrackMap {
     track_map: FogMap,
-    bg_color: tiny_skia::ColorU8,
-    fg_color: tiny_skia::ColorU8,
+    render_backend: Box<dyn TileRendererTrait>,
+    bg_color: Rgba<u8>,
+    fg_color: Rgba<u8>,
     current_render_area: Option<RenderArea>,
-    tile_size: TileSize,
-    gpu_worker: Option<FogRendererGpu>,
 }
 
-#[allow(dead_code)]
 impl RenderedTrackMap {
     pub fn new() -> Self {
         let track_map = FogMap::new();
@@ -84,45 +54,30 @@ impl RenderedTrackMap {
     }
 
     pub fn new_with_track_map(track_map: FogMap) -> Self {
+        let tile_size = TileSize::TileSize512;
+        let render_backend = Box::new(TileRendererBasic::new(tile_size));
         Self {
             track_map,
-            bg_color: DEFAULT_BG_COLOR,
-            fg_color: DEFAULT_FG_COLOR,
+            render_backend,
+            bg_color: DEFAULT_BG_COLOR2,
+            fg_color: DEFAULT_FG_COLOR2,
             current_render_area: None,
-            tile_size: TileSize::TileSize512,
-            gpu_worker: None,
         }
     }
 
     pub fn set_fg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
-        self.fg_color = tiny_skia::ColorU8::from_rgba(r, g, b, a);
+        self.fg_color = Rgba([r, g, b, a]);
         self.clear_buffer();
     }
 
     pub fn set_bg_color(&mut self, r: u8, g: u8, b: u8, a: u8) {
-        self.bg_color = tiny_skia::ColorU8::from_rgba(r, g, b, a);
+        self.bg_color = Rgba([r, g, b, a]);
         self.clear_buffer();
     }
 
-    pub fn set_tile_size(&mut self, tile_size: TileSize) {
-        self.tile_size = tile_size;
-        self.clear_buffer();
-        // if gpu is used, we need to re-create the gpu worker
-        if let Some(_) = &self.gpu_worker {
-            self.set_use_gpu(true);
-        }
-    }
-
-    pub fn set_use_gpu(&mut self, use_gpu: bool) {
-        let tile_size = self.tile_size.size();
-        if use_gpu {
-            let gpu_worker = Runtime::new()
-                .unwrap()
-                .block_on(async move { FogRendererGpu::new(tile_size, tile_size).await });
-            self.gpu_worker = Some(gpu_worker);
-        } else {
-            self.gpu_worker = None;
-        }
+    // for debug and testing purpose
+    pub fn set_rendering_backend(&mut self, backend: Box<dyn TileRendererTrait>) {
+        self.render_backend = backend;
         self.clear_buffer();
     }
 
@@ -134,15 +89,10 @@ impl RenderedTrackMap {
     /// The area is usually larger than the display area to prevent flashing during
     /// zooming and panning.
     fn render_region_containing_bbox(&self, render_area: &RenderArea) -> RenderResult {
-        // TODO: Change render backend. Right now we are using `tiny-skia`,
-        // it should work just fine and we don't really need fancy features.
-        // However, it is mostly a research project and does not feel like production ready,
-        // `rust-skia` looks a lot better and has better performance (unlike `tiny-skia` is
-        // purely on CPU, `rust-skia` can be ran on GPU). The reason we use `tiny-skia` right
-        // now is that it is pure rust, so we don't need to think about how to build depenceies
-        // for various platform.
+        // TODO: figure out if we need a skia-like backend for rendering, if so, we can use `rust-skia`
+        // `rust-skia` looks good and has good performance (GPU friendly)
 
-        let tile_size: u32 = self.tile_size.size();
+        let tile_size: u32 = self.render_backend.get_tile_size().size();
 
         let width_by_tile: u32 = (render_area.right_idx - render_area.left_idx + 1)
             .try_into()
@@ -151,53 +101,22 @@ impl RenderedTrackMap {
             .try_into()
             .unwrap();
 
-        // TODO: reuse resurces?
-        let mut pixmap =
-            Pixmap::new(tile_size * width_by_tile, tile_size * height_by_tile).unwrap();
-        // color must be set to the tile renderer directly upon its creation
+        let mut image = RgbaImage::new(tile_size * width_by_tile, tile_size * height_by_tile);
 
         for x in 0..width_by_tile {
             for y in 0..height_by_tile {
                 // TODO: cache?
 
-                let tile_pixmap = TileShader::render_pixmap(
+                self.render_backend.render_on_image(
+                    &mut image,
+                    x * tile_size,
+                    y * tile_size,
                     &self.track_map,
                     render_area.left_idx as i64 + x as i64,
                     render_area.top_idx as i64 + y as i64,
                     render_area.zoom as i16,
-                    self.tile_size.power(),
                     self.bg_color,
                     self.fg_color,
-                );
-
-                debug_assert_eq!(tile_pixmap.width(), tile_size);
-                debug_assert_eq!(tile_pixmap.height(), tile_size);
-
-                println!("processing tile pixmap`");
-
-                let processed_tile_pixmap_data = {
-                    if let Some(gpu_worker) = &self.gpu_worker {
-                        let rt = Runtime::new().unwrap();
-                        rt.block_on(gpu_worker.process_frame_async(tile_pixmap.data()))
-                    } else {
-                        tile_pixmap.data().to_vec()
-                    }
-                };
-
-                // println!("output_image_data length: {}", output_image_data.len());
-                let processed_tile_pixmap = Pixmap::from_vec(
-                    processed_tile_pixmap_data,
-                    IntSize::from_wh(tile_size, tile_size).unwrap(),
-                )
-                .unwrap();
-
-                pixmap.draw_pixmap(
-                    (x * tile_size) as i32,
-                    (y * tile_size) as i32,
-                    processed_tile_pixmap.as_ref(),
-                    &PixmapPaint::default(),
-                    Transform::identity(),
-                    None,
                 );
             }
         }
@@ -211,14 +130,16 @@ impl RenderedTrackMap {
             render_area.zoom,
         );
 
+        let image_png = utils::image_to_png_data(&image);
+
         RenderResult {
-            width: pixmap.width(),
-            height: pixmap.height(),
+            width: tile_size * width_by_tile,
+            height: tile_size * height_by_tile,
             top: overlay_top,
             left: overlay_left,
             right: overlay_right,
             bottom: overlay_bottom,
-            data: pixmap.encode_png().unwrap(),
+            data: image_png,
         }
     }
 

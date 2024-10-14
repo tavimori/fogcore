@@ -3,13 +3,48 @@ use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 
 use crate::FogMap;
-use std::path::Path;
+use image::{Rgba, RgbaImage};
 use std::fs::{self, File};
+use std::io::Cursor;
 use std::io::Read;
+use std::path::Path;
 
+// TODO: unify the color type to `Rgba<u8>`
 pub const DEFAULT_BG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 127);
 pub const DEFAULT_FG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 0);
+
+pub const DEFAULT_BG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 127]);
+pub const DEFAULT_FG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 0]);
+
+// TODO: make this consistant (currently these two are different)
+// currently TileSize512 is used in rendered map, modify it to match with the default here.
 pub const DEFAULT_VIEW_SIZE_POWER: i16 = 8;
+pub const DEFAULT_TILE_SIZE: TileSize = TileSize::TileSize256;
+
+#[derive(Debug, Copy, Clone)]
+pub enum TileSize {
+    TileSize256,
+    TileSize512,
+    TileSize1024,
+}
+
+impl TileSize {
+    pub fn size(&self) -> u32 {
+        match self {
+            TileSize::TileSize256 => 256,
+            TileSize::TileSize512 => 512,
+            TileSize::TileSize1024 => 1024,
+        }
+    }
+
+    pub fn power(&self) -> i16 {
+        match self {
+            TileSize::TileSize256 => 8,
+            TileSize::TileSize512 => 9,
+            TileSize::TileSize1024 => 10,
+        }
+    }
+}
 
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -21,7 +56,6 @@ pub fn set_panic_hook() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 }
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub fn lng_to_tile_x(lng: f64, zoom: i16) -> i64 {
@@ -45,6 +79,13 @@ pub fn tile_x_y_to_lng_lat(x: i32, y: i32, zoom: i32) -> (f64, f64) {
     (lng, lat)
 }
 
+pub fn image_to_png_data(image: &RgbaImage) -> Vec<u8> {
+    let mut image_png: Vec<u8> = Vec::new();
+    image
+        .write_to(&mut Cursor::new(&mut image_png), image::ImageFormat::Png)
+        .unwrap();
+    image_png
+}
 
 pub fn load_tracks_map_folder(tiles_dir: &str) -> FogMap {
     let mut fogmap = FogMap::new();

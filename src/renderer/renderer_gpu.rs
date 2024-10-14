@@ -1,5 +1,13 @@
 use crate::log_print;
+use crate::renderer::TileRendererBasic;
+use crate::renderer::TileRendererTrait;
+use crate::utils::TileSize;
+use crate::FogMap;
+use image::GenericImage;
+use image::Rgba;
+use image::RgbaImage;
 use std::sync::Arc;
+use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio::task;
 use wasm_bindgen_futures::spawn_local;
@@ -7,7 +15,7 @@ use wgpu::{self, BindGroup, Buffer, ComputePipeline, Device, Queue};
 
 const WORKGROUP_SIZE: (u32, u32) = (16, 16);
 
-pub struct FogRendererGpu {
+pub struct TileRendererPremium {
     device: Arc<Device>,
     queue: Arc<Queue>,
     compute_pipeline: ComputePipeline,
@@ -17,10 +25,59 @@ pub struct FogRendererGpu {
     dimensions_buffer: Buffer,
     width: u32,
     height: u32,
+    renderer: TileRendererBasic,
 }
 
-impl FogRendererGpu {
-    pub async fn new(width: u32, height: u32) -> Self {
+impl TileRendererTrait for TileRendererPremium {
+    fn get_tile_size(&self) -> TileSize {
+        self.renderer.get_tile_size()
+    }
+
+    fn render_on_image(
+        &self,
+        image: &mut RgbaImage,
+        start_x: u32,
+        start_y: u32,
+        fogmap: &FogMap,
+        view_x: i64,
+        view_y: i64,
+        zoom: i16,
+        bg_color: Rgba<u8>,
+        fg_color: Rgba<u8>,
+    ) {
+        // check the image size
+        let tile_size = self.get_tile_size().size();
+        debug_assert!(image.width() >= start_x + self.get_tile_size().size() as u32);
+        debug_assert!(image.height() >= start_y + self.get_tile_size().size() as u32);
+
+        // currently the gpu shading cannot be applied in-place
+        let temp_image = self
+            .renderer
+            .render_image(fogmap, view_x, view_y, zoom, bg_color, fg_color);
+        let rt = Runtime::new().unwrap();
+
+        let processed_image = RgbaImage::from_raw(
+            tile_size,
+            tile_size,
+            rt.block_on(self.process_frame_async(temp_image.as_raw())),
+        )
+        .unwrap();
+
+        let _ = image.copy_from(&processed_image, start_x, start_y);
+    }
+}
+
+impl TileRendererPremium {
+    pub fn new_sync(tile_size: TileSize) -> Self {
+        Runtime::new()
+            .unwrap()
+            .block_on(async move { Self::new(tile_size).await })
+    }
+
+    pub async fn new(tile_size: TileSize) -> Self {
+        let width = tile_size.size() as u32;
+        let height = tile_size.size() as u32;
+
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             dx12_shader_compiler: Default::default(),
@@ -183,6 +240,7 @@ impl FogRendererGpu {
             dimensions_buffer,
             width,
             height,
+            renderer: TileRendererBasic::new(tile_size),
         }
     }
 

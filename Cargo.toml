@@ -29,6 +29,7 @@ bytemuck = "1.17.0"
 wasm-bindgen-futures = "0.4.43"
 tokio = { version = "1.40.0", features = ["rt", "sync"] }
 tokio-macros = "2.4.0"
+image = { version = "0.25.2", features = ["png"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }

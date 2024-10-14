@@ -15,7 +15,8 @@ pub mod wasm;
 mod logging;
 
 pub use renderer::TileShader;
-pub use renderer::FogRendererGpu;
+pub use renderer::TileRendererBasic;
+pub use renderer::TileRendererPremium;
 
 pub use fogmaps::FogMap;
 pub use utils::*;

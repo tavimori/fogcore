@@ -1,9 +1,11 @@
 use fogcore::load_tracks_map_folder;
 use fogcore::renderer::RenderedTrackMap;
-use fogcore::renderer::{BBox, Point, TileSize};
-use fogcore::TileShader;
-use fogcore::DEFAULT_VIEW_SIZE_POWER;
-use fogcore::{lat_to_tile_y, lng_to_tile_x};
+use fogcore::renderer::TileRendererBasic;
+use fogcore::renderer::TileRendererPremium;
+use fogcore::renderer::TileRendererTrait;
+use fogcore::renderer::{BBox, Point};
+use fogcore::TileSize;
+use fogcore::{image_to_png_data, lat_to_tile_y, lng_to_tile_x};
 use serde_json;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -76,8 +78,8 @@ fn verify_image(name: &str, image: &Vec<u8>) {
 fn main() {
     let fogmap = load_tracks_map_folder("static/tiles");
 
-    let bg_color = tiny_skia::ColorU8::from_rgba(100, 0, 100, 255);
-    let fg_color = tiny_skia::ColorU8::from_rgba(0, 0, 0, 0);
+    let bg_color = image::Rgba([100, 0, 100, 255]);
+    let fg_color = image::Rgba([0, 0, 0, 0]);
 
     // Define cities
     let cities = vec![
@@ -114,16 +116,9 @@ fn main() {
             city.name, tile_x, tile_y
         );
 
-        let pixmap = TileShader::render_pixmap(
-            &fogmap,
-            tile_x,
-            tile_y,
-            city.zoom,
-            DEFAULT_VIEW_SIZE_POWER,
-            bg_color,
-            fg_color,
-        );
-        let png = pixmap.encode_png().unwrap();
+        let renderer = TileRendererBasic::new(TileSize::TileSize256);
+        let image = renderer.render_image(&fogmap, tile_x, tile_y, city.zoom, bg_color, fg_color);
+        let png = image_to_png_data(&image);
         verify_image(city.name, &png);
     }
 
@@ -133,10 +128,7 @@ fn main() {
 }
 
 #[test]
-fn test_different_scale_rendering() {
-    let tracks_map = load_tracks_map_folder("static/tiles");
-    let rendered_map = RenderedTrackMap::new_with_track_map(tracks_map);
-}
+fn test_different_scale_rendering() {}
 
 #[test]
 fn test_different_size_rendering() {
@@ -154,21 +146,21 @@ fn test_different_size_rendering() {
         },
     };
 
-    rendered_map.set_tile_size(TileSize::TileSize256);
+    rendered_map.set_rendering_backend(Box::new(TileRendererBasic::new(TileSize::TileSize256)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_256", &composed_png);
 
-    rendered_map.set_tile_size(TileSize::TileSize512);
+    rendered_map.set_rendering_backend(Box::new(TileRendererBasic::new(TileSize::TileSize512)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_512", &composed_png);
 
-    rendered_map.set_tile_size(TileSize::TileSize1024);
+    rendered_map.set_rendering_backend(Box::new(TileRendererBasic::new(TileSize::TileSize1024)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
@@ -176,23 +168,27 @@ fn test_different_size_rendering() {
     verify_image("different_size_rendering_shenzhen_1024", &composed_png);
 
     // GPU rendering with high-DPI
-    rendered_map.set_use_gpu(true);
-
-    rendered_map.set_tile_size(TileSize::TileSize256);
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+        TileSize::TileSize256,
+    )));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_png);
 
-    rendered_map.set_tile_size(TileSize::TileSize512);
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+        TileSize::TileSize512,
+    )));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_png);
 
-    rendered_map.set_tile_size(TileSize::TileSize1024);
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+        TileSize::TileSize1024,
+    )));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
