@@ -36,14 +36,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let self_idx = y * width + x;
 
-    // TODO: a better way to handle border pixels
-    // Skip border pixels
-    if (x < 2u || x >= width - 2u || y < 2u || y >= height - 2u) {
-        output[self_idx] = input[self_idx];
-        return;
-    }
-
-
     let self_alpha = f32(input[self_idx] >> 24u) / 255.0;
     var min_alpha = 1.0;
     var max_r = 0u;
@@ -52,8 +44,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     for (var ky = 0u; ky < KERNEL_SIZE; ky++) {
         for (var kx = 0u; kx < KERNEL_SIZE; kx++) {
-            let px = i32(x) + i32(kx) - 2;
-            let py = i32(y) + i32(ky) - 2;
+            // Skip border pixels
+            let px = clamp(i32(x) + i32(kx) - 2, 0, i32(width - 1));
+            let py = clamp(i32(y) + i32(ky) - 2, 0, i32(height - 1));
             let weight = get_kernel_weight(ky, kx);
 
             let idx = u32(py) * width + u32(px);
