@@ -182,24 +182,49 @@ impl FogMap {
 }
 
 pub struct Tile {
-    blocks: HashMap<(i64, i64), Block>,
+    // TODO: theoretically we need GC for this data structure, but in practice it is not necessary.
+    blocks_key: Vec<i16>,
+    blocks_buffer: Vec<Option<Block>>,
 }
 
 impl Tile {
     pub fn new() -> Self {
         Self {
-            blocks: HashMap::new(),
+            blocks_key: vec![-1; (TILE_WIDTH * TILE_WIDTH) as usize],
+            blocks_buffer: Vec::new(),
         }
     }
 
     fn add_by_blocks(&mut self, x: i64, y: i64, block: Block) {
         // TODO: current implementation will replace the tile if exist, change it to additive editing.
         // TODO: rethink the data type and whether should use into()
-        self.blocks.insert((x, y), block);
+        let index = (x << TILE_WIDTH_OFFSET) + y;
+        if self.blocks_key[index as usize] == -1 {
+            self.blocks_key[index as usize] = self.blocks_buffer.len() as i16;
+            self.blocks_buffer.push(Some(block));
+        } else {
+            self.blocks_buffer[self.blocks_key[index as usize] as usize] = Some(block);
+        }
     }
 
-    pub fn blocks(&self) -> &HashMap<(i64, i64), Block> {
-        &self.blocks
+    fn get_or_insert_block(&mut self, x: i64, y: i64) -> &mut Block {
+        let index = (x << TILE_WIDTH_OFFSET) + y;
+        if self.blocks_key[index as usize] == -1 {
+            self.blocks_key[index as usize] = self.blocks_buffer.len() as i16;
+            self.blocks_buffer.push(Some(Block::new()));
+        }
+        self.blocks_buffer[self.blocks_key[index as usize] as usize]
+            .as_mut()
+            .unwrap()
+    }
+
+    pub fn get_block(&self, x: i64, y: i64) -> Option<&Block> {
+        let index = (x << TILE_WIDTH_OFFSET) + y;
+        if self.blocks_key[index as usize] == -1 {
+            None
+        } else {
+            self.blocks_buffer[self.blocks_key[index as usize] as usize].as_ref()
+        }
     }
 
     fn add_line(
@@ -228,11 +253,7 @@ impl Tile {
                 let block_x = x >> BITMAP_WIDTH_OFFSET;
                 let block_y = y >> BITMAP_WIDTH_OFFSET;
 
-                let block = self
-                    .blocks
-                    .entry((block_x, block_y))
-                    .or_insert(Block::new());
-
+                let block = self.get_or_insert_block(block_x, block_y);
                 (x, y, p) = block.add_line(
                     x - (block_x << BITMAP_WIDTH_OFFSET),
                     y - (block_y << BITMAP_WIDTH_OFFSET),
@@ -259,10 +280,7 @@ impl Tile {
                 let block_x = x >> BITMAP_WIDTH_OFFSET;
                 let block_y = y >> BITMAP_WIDTH_OFFSET;
 
-                let block = self
-                    .blocks
-                    .entry((block_x, block_y))
-                    .or_insert(Block::new());
+                let block = self.get_or_insert_block(block_x, block_y);
                 (x, y, p) = block.add_line(
                     x - (block_x << BITMAP_WIDTH_OFFSET),
                     y - (block_y << BITMAP_WIDTH_OFFSET),
