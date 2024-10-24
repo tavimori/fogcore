@@ -68,13 +68,13 @@ impl TileRendererTrait for TileRendererPremium {
 }
 
 impl TileRendererPremium {
-    pub fn new_sync(tile_size: TileSize) -> Self {
+    pub fn new(tile_size: TileSize) -> Self {
         Runtime::new()
             .unwrap()
-            .block_on(async move { Self::new(tile_size).await })
+            .block_on(async move { Self::new_async(tile_size).await })
     }
 
-    pub async fn new(tile_size: TileSize) -> Self {
+    pub async fn new_async(tile_size: TileSize) -> Self {
         let width = tile_size.size() as u32;
         let height = tile_size.size() as u32;
 

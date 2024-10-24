@@ -22,7 +22,7 @@ impl TileShader {
     // TODO: may use mipmap to accelerate the rendering.
     // TODO: currently if a pixel contains multiple tile / block, the rendering process will write over the pixel multiple times, may use other interpolation method.
     // We use a method called max-pooling interpolation to enlarge the tracks while keeping them easy to see at different sizes.
-    pub fn render_on_image2(
+    pub fn render_on_image(
         image: &mut RgbaImage,
         start_x: u32,
         start_y: u32,

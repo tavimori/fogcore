@@ -71,7 +71,7 @@ impl TileRendererTrait for TileRendererBasic {
         debug_assert!(image.width() >= start_x + self.tile_size.size() as u32);
         debug_assert!(image.height() >= start_y + self.tile_size.size() as u32);
 
-        TileShader::render_on_image2(
+        TileShader::render_on_image(
             image,
             start_x,
             start_y,
