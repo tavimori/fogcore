@@ -225,7 +225,7 @@ impl TileRendererPremium {
             label: Some("Compute Pipeline"),
             layout: Some(&pipeline_layout),
             module: &shader,
-            entry_point: "main",
+            entry_point: Some("main"),
             cache: None,
             compilation_options: Default::default(),
         });
