@@ -16,15 +16,15 @@ use std::sync::Arc;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
-    position: [f32; 3],
+    position: [f32; 2],
     color: [f32; 3],
 }
 
 // Define the vertices we want to draw
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [256.0, 384.0], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [128.0, 128.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [384.0, 128.0], color: [0.0, 0.0, 1.0] },
 ];
 
 // Uniform buffer for transformation and colors
@@ -56,7 +56,7 @@ struct Uniforms {
 var<uniform> uniforms: Uniforms;
 
 @vertex
-fn vs_main(@location(0) position: vec3<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
+fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
 
     // for each point, we clip a square around it
     let points = array(
@@ -78,7 +78,7 @@ fn vs_main(@location(0) position: vec3<f32>, @location(1) color: vec3<f32>) -> V
     // output.size = input.point_size;
     // output.center = input.position.xy;
 
-    output.position = vec4<f32>(position, 1.0);
+    output.position = uniforms.matrix * vec4<f32>(position, 0.0, 1.0);
     // output.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
     // output.color_bg = vec4<f32>(0.0, 1.0, 0.0, 1.0);
     output.size = 1.0;
@@ -191,10 +191,10 @@ impl<'a> State<'a> {
                         wgpu::VertexAttribute {
                             offset: 0,
                             shader_location: 0,
-                            format: wgpu::VertexFormat::Float32x3,
+                            format: wgpu::VertexFormat::Float32x2,
                         },
                         wgpu::VertexAttribute {
-                            offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                            offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                             shader_location: 1,
                             format: wgpu::VertexFormat::Float32x3,
                         },
@@ -230,7 +230,7 @@ impl<'a> State<'a> {
 
         // Create uniform buffer and bind group
         let uniforms = Uniforms {
-            matrix: create_orthographic_matrix(0.0, 800.0, 0.0, 600.0),
+            matrix: create_orthographic_matrix(0.0, 512.0, 0.0, 512.0),
             color: [0.0, 0.5, 0.0, 0.8],
             color_bg: [0.5, 0.0, 0.0, 0.8],
         };
