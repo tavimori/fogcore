@@ -1,13 +1,8 @@
 use std::iter;
 use wgpu::util::DeviceExt;
-// use winit::{
-//     event::*,
-//     event_loop::{ControlFlow, EventLoop},
-//     window::{Window},
-// };
 use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop,
-    event_loop::ControlFlow, event_loop::EventLoop, window::Window, window::WindowAttributes,
+    event_loop::ControlFlow, event_loop::EventLoop, window::Window,
     window::WindowId,
 };
 use std::sync::Arc;
@@ -25,6 +20,16 @@ const VERTICES: &[Vertex] = &[
     Vertex { position: [256.0, 384.0], color: [1.0, 0.0, 0.0] },
     Vertex { position: [128.0, 128.0], color: [0.0, 1.0, 0.0] },
     Vertex { position: [384.0, 128.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [100.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [200.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [300.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [400.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [500.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [600.0, 200.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [100.0, 300.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [100.0, 400.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [100.0, 500.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [100.0, 600.0], color: [0.0, 0.0, 1.0] },
 ];
 
 // Uniform buffer for transformation and colors
@@ -32,6 +37,7 @@ const VERTICES: &[Vertex] = &[
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
     matrix: [[f32; 4]; 4],
+    size: [f32; 4],
     color: [f32; 4],
     color_bg: [f32; 4],
 }
@@ -48,6 +54,7 @@ struct VertexOutput {
 
 struct Uniforms {
     matrix: mat4x4<f32>,
+    size: vec4<f32>,
     color: vec4<f32>,
     color_bg: vec4<f32>,
 };
@@ -56,7 +63,9 @@ struct Uniforms {
 var<uniform> uniforms: Uniforms;
 
 @vertex
-fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
+fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>,
+    @builtin(vertex_index) vNdx: u32
+) -> VertexOutput {
 
     // for each point, we clip a square around it
     let points = array(
@@ -68,6 +77,7 @@ fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> V
         vec2f( 1,  1),
     );
 
+    let pos = points[vNdx];
     
     // return vec4<f32>(position, 1.0);
     var output: VertexOutput;
@@ -78,19 +88,37 @@ fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> V
     // output.size = input.point_size;
     // output.center = input.position.xy;
 
-    output.position = uniforms.matrix * vec4<f32>(position, 0.0, 1.0);
+    // TODO: clamp all the positions
+
+    output.position = uniforms.matrix * vec4<f32>(position + pos * 10.0, 0.0, 1.0);
     // output.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
     // output.color_bg = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-    output.size = 1.0;
-    output.center = position.xy;
+    output.size = (uniforms.matrix * vec4<f32>(3.0, 3.0, 0.0, 1.0)).x;
+    output.center = (uniforms.matrix * vec4<f32>(position, 0.0, 1.0)).xy;
     
     return output;
 }
 
 @fragment
 fn fs_main(vsOutput: VertexOutput) -> @location(0) vec4<f32> {
-    // return vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    return vsOutput.color;
+    var center = (vsOutput.center + vec2<f32>(1.0, 1.0)) * 0.5 * uniforms.size.xy;
+    // TODO: this is a hack to flip the y axis, fix this
+    center.y = uniforms.size.y - center.y;
+
+    let dist = length(vsOutput.position.xy / vsOutput.position.w - center);
+    let diff = vsOutput.position.xy / vsOutput.position.w - center;
+    
+    if (dist > 7.0) {
+        discard;
+    }
+
+    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+
+    // Smooth the edges
+    // let smoothing = 0.1;
+    // let alpha = 1.0 - smoothstep(0.8, 1.0, dist);
+    
+    // return vec4<f32>(input.color.rgb, input.color.a * alpha);
 }
 "#;
 
@@ -158,7 +186,7 @@ impl<'a> State<'a> {
             label: Some("Bind Group Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -186,7 +214,7 @@ impl<'a> State<'a> {
                 compilation_options: Default::default(),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Vertex,
+                    step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &[
                         wgpu::VertexAttribute {
                             offset: 0,
@@ -230,7 +258,8 @@ impl<'a> State<'a> {
 
         // Create uniform buffer and bind group
         let uniforms = Uniforms {
-            matrix: create_orthographic_matrix(0.0, 512.0, 0.0, 512.0),
+            matrix: create_orthographic_matrix(0.0, size.width as f32, 0.0, size.height as f32),
+            size: [size.width as f32, size.height as f32, 0.0, 0.0],
             color: [0.0, 0.5, 0.0, 0.8],
             color_bg: [0.5, 0.0, 0.0, 0.8],
         };
@@ -264,6 +293,25 @@ impl<'a> State<'a> {
         }
     }
 
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+
+            let uniforms = Uniforms {
+                matrix: create_orthographic_matrix(0.0, new_size.width as f32, 0.0, new_size.height as f32),
+                size: [new_size.width as f32, new_size.height as f32, 0.0, 0.0],
+                color: [0.0, 0.5, 0.0, 0.8],
+                color_bg: [0.5, 0.0, 0.0, 0.8],
+            };
+
+            self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        }
+    }
+
+
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -296,7 +344,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw(0..6, 0..13);
         }
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -378,10 +426,10 @@ impl ApplicationHandler for App<'_> {
                 }
             }
             WindowEvent::Resized(new_size) => {
-                println!("Window Resized Requested");
-                // if let Some(state) = self.state.as_mut() {
-                //     state.resize(new_size);
-                // }
+                println!("Window Resized Requested: {:?}", new_size);
+                if let Some(state) = self.state.as_mut() {
+                    state.resize(new_size);
+                }
             }
             _ => (),
         }
