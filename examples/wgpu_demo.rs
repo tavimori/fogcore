@@ -1,3 +1,4 @@
+use image::{Pixel, Rgba};
 use std::iter;
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
@@ -7,55 +8,12 @@ use winit::{
 };
 
 const DEFAULT_DOT_SIZE: f32 = 3.0;
+const DEFAULT_BG_COLOR2: Rgba<u8> = Rgba([255, 0, 255, 127]);
+const DEFAULT_FG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
-// Vertex struct to define the data we'll send to the GPU
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 2],
-}
-
-// Define the vertices we want to draw
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [256.0, 384.0],
-    },
-    Vertex {
-        position: [128.0, 128.0],
-    },
-    Vertex {
-        position: [384.0, 128.0],
-    },
-    Vertex {
-        position: [100.0, 200.0],
-    },
-    Vertex {
-        position: [200.0, 200.0],
-    },
-    Vertex {
-        position: [300.0, 200.0],
-    },
-    Vertex {
-        position: [400.0, 200.0],
-    },
-    Vertex {
-        position: [500.0, 200.0],
-    },
-    Vertex {
-        position: [600.0, 200.0],
-    },
-    Vertex {
-        position: [100.0, 300.0],
-    },
-    Vertex {
-        position: [100.0, 400.0],
-    },
-    Vertex {
-        position: [100.0, 500.0],
-    },
-    Vertex {
-        position: [100.0, 600.0],
-    },
+const PIXELS: &[f32] = &[
+    256.0, 384.0, 128.0, 128.0, 384.0, 128.0, 100.0, 200.0, 200.0, 200.0, 300.0, 200.0, 400.0,
+    200.0, 500.0, 200.0, 600.0, 200.0, 100.0, 300.0, 100.0, 400.0, 100.0, 500.0, 100.0, 600.0,
 ];
 
 // Uniform buffer for transformation and colors
@@ -117,7 +75,7 @@ fn vs_main(@location(0) position: vec2<f32>,
 @fragment
 fn fs_main(vsOutput: VertexOutput) -> @location(0) vec4<f32> {
     var center = (vsOutput.center + vec2<f32>(1.0, 1.0)) * 0.5 * uniforms.size.xy;
-    // TODO: this is a hack to flip the y axis, fix this
+    // TODO: this is a hack to flip the y axis, maybe its platform dependent
     center.y = uniforms.size.y - center.y;
 
     let dist = length(vsOutput.position.xy / vsOutput.position.w - center);
@@ -127,7 +85,7 @@ fn fs_main(vsOutput: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    return uniforms.color;
 
     // Smooth the edges
     // let smoothing = 0.1;
@@ -148,6 +106,8 @@ struct State<'a> {
     uniform_bind_group: wgpu::BindGroup,
     size: winit::dpi::PhysicalSize<u32>,
     dot_size: f32,
+    bg_color: Rgba<u8>,
+    fg_color: Rgba<u8>,
 }
 
 impl<'a> State<'a> {
@@ -235,7 +195,7 @@ impl<'a> State<'a> {
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+                    array_stride: (std::mem::size_of::<f32>() * 2) as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &[wgpu::VertexAttribute {
                         offset: 0,
@@ -267,17 +227,20 @@ impl<'a> State<'a> {
         // Create vertex buffer
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
+            contents: bytemuck::cast_slice(PIXELS),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
+        let bg_color = DEFAULT_BG_COLOR2;
+        let fg_color = DEFAULT_FG_COLOR2;
+
         // Create uniform buffer and bind group
         let uniforms = Uniforms {
-            matrix: create_orthographic_matrix(0.0, size.width as f32, 0.0, size.height as f32),
+            matrix: create_orthographic_matrix(0.0, size.width as f32, size.height as f32, 0.0),
             size: [size.width as f32, size.height as f32, 0.0, 0.0],
             dot_size: [dot_size, dot_size, 0.0, 0.0],
-            color: [0.0, 0.5, 0.0, 0.8],
-            color_bg: [0.5, 0.0, 0.0, 0.8],
+            color: rgba_to_vec4(fg_color),
+            color_bg: rgba_to_vec4(bg_color),
         };
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -306,6 +269,8 @@ impl<'a> State<'a> {
             uniform_bind_group,
             size,
             dot_size,
+            bg_color,
+            fg_color,
         }
     }
 
@@ -320,13 +285,13 @@ impl<'a> State<'a> {
                 matrix: create_orthographic_matrix(
                     0.0,
                     new_size.width as f32,
-                    0.0,
                     new_size.height as f32,
+                    0.0,
                 ),
                 size: [new_size.width as f32, new_size.height as f32, 0.0, 0.0],
                 dot_size: [self.dot_size, self.dot_size, 0.0, 0.0],
-                color: [0.0, 0.5, 0.0, 0.8],
-                color_bg: [0.5, 0.0, 0.0, 0.8],
+                color: rgba_to_vec4(self.fg_color),
+                color_bg: rgba_to_vec4(self.bg_color),
             };
 
             self.queue
@@ -354,10 +319,10 @@ impl<'a> State<'a> {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
+                            r: self.bg_color.channels()[0] as f64 / 255.0,
+                            g: self.bg_color.channels()[1] as f64 / 255.0,
+                            b: self.bg_color.channels()[2] as f64 / 255.0,
+                            a: self.bg_color.channels()[3] as f64 / 255.0,
                         }),
                         store: wgpu::StoreOp::Store,
                     },
@@ -463,7 +428,6 @@ impl ApplicationHandler for App<'_> {
 }
 
 fn main() {
-    // pollster::block_on(run());
     let event_loop = EventLoop::new().unwrap();
 
     event_loop.set_control_flow(ControlFlow::Wait);
@@ -482,5 +446,14 @@ fn create_orthographic_matrix(left: f32, right: f32, bottom: f32, top: f32) -> [
         [0.0, 2.0 / (top - bottom), 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
         [tx, ty, 0.0, 1.0],
+    ]
+}
+
+fn rgba_to_vec4(color: Rgba<u8>) -> [f32; 4] {
+    [
+        color.channels()[0] as f32 / 255.0,
+        color.channels()[1] as f32 / 255.0,
+        color.channels()[2] as f32 / 255.0,
+        color.channels()[3] as f32 / 255.0,
     ]
 }
