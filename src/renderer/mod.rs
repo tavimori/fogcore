@@ -5,6 +5,12 @@ pub mod tile_shader;
 
 pub use tile_shader::TileShader;
 
+pub mod tile_shader2;
+pub use tile_shader2::TileShader2;
+
+pub mod renderer_premium2;
+pub use renderer_premium2::TileRendererPremium2;
+
 pub use renderer_basic::TileRendererBasic;
 pub use renderer_basic::TileRendererTrait;
 
