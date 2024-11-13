@@ -1,35 +1,61 @@
 use std::iter;
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop,
-    event_loop::ControlFlow, event_loop::EventLoop, window::Window,
-    window::WindowId,
+    event_loop::ControlFlow, event_loop::EventLoop, window::Window, window::WindowId,
 };
-use std::sync::Arc;
+
+const DEFAULT_DOT_SIZE: f32 = 3.0;
 
 // Vertex struct to define the data we'll send to the GPU
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 2],
-    color: [f32; 3],
 }
 
 // Define the vertices we want to draw
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [256.0, 384.0], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [128.0, 128.0], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [384.0, 128.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [100.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [200.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [300.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [400.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [500.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [600.0, 200.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [100.0, 300.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [100.0, 400.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [100.0, 500.0], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [100.0, 600.0], color: [0.0, 0.0, 1.0] },
+    Vertex {
+        position: [256.0, 384.0],
+    },
+    Vertex {
+        position: [128.0, 128.0],
+    },
+    Vertex {
+        position: [384.0, 128.0],
+    },
+    Vertex {
+        position: [100.0, 200.0],
+    },
+    Vertex {
+        position: [200.0, 200.0],
+    },
+    Vertex {
+        position: [300.0, 200.0],
+    },
+    Vertex {
+        position: [400.0, 200.0],
+    },
+    Vertex {
+        position: [500.0, 200.0],
+    },
+    Vertex {
+        position: [600.0, 200.0],
+    },
+    Vertex {
+        position: [100.0, 300.0],
+    },
+    Vertex {
+        position: [100.0, 400.0],
+    },
+    Vertex {
+        position: [100.0, 500.0],
+    },
+    Vertex {
+        position: [100.0, 600.0],
+    },
 ];
 
 // Uniform buffer for transformation and colors
@@ -38,6 +64,7 @@ const VERTICES: &[Vertex] = &[
 struct Uniforms {
     matrix: [[f32; 4]; 4],
     size: [f32; 4],
+    dot_size: [f32; 4],
     color: [f32; 4],
     color_bg: [f32; 4],
 }
@@ -46,15 +73,13 @@ struct Uniforms {
 const SHADER: &str = r#"
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) color: vec4<f32>,
-    @location(1) color_bg: vec4<f32>,
-    @location(2) size: f32,
-    @location(3) center: vec2<f32>,
+    @location(0) center: vec2<f32>,
 };
 
 struct Uniforms {
     matrix: mat4x4<f32>,
     size: vec4<f32>,
+    dot_size: vec4<f32>,
     color: vec4<f32>,
     color_bg: vec4<f32>,
 };
@@ -63,7 +88,7 @@ struct Uniforms {
 var<uniform> uniforms: Uniforms;
 
 @vertex
-fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>,
+fn vs_main(@location(0) position: vec2<f32>,
     @builtin(vertex_index) vNdx: u32
 ) -> VertexOutput {
 
@@ -79,21 +104,11 @@ fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>,
 
     let pos = points[vNdx];
     
-    // return vec4<f32>(position, 1.0);
     var output: VertexOutput;
-    
-    // output.position = uniforms.matrix * input.position;
-    output.color = uniforms.color;
-    output.color_bg = uniforms.color_bg;
-    // output.size = input.point_size;
-    // output.center = input.position.xy;
 
     // TODO: clamp all the positions
 
-    output.position = uniforms.matrix * vec4<f32>(position + pos * 10.0, 0.0, 1.0);
-    // output.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-    // output.color_bg = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-    output.size = (uniforms.matrix * vec4<f32>(3.0, 3.0, 0.0, 1.0)).x;
+    output.position = uniforms.matrix * vec4<f32>(position + pos * uniforms.dot_size.x, 0.0, 1.0);
     output.center = (uniforms.matrix * vec4<f32>(position, 0.0, 1.0)).xy;
     
     return output;
@@ -108,7 +123,7 @@ fn fs_main(vsOutput: VertexOutput) -> @location(0) vec4<f32> {
     let dist = length(vsOutput.position.xy / vsOutput.position.w - center);
     let diff = vsOutput.position.xy / vsOutput.position.w - center;
     
-    if (dist > 7.0) {
+    if (dist > uniforms.dot_size.x) {
         discard;
     }
 
@@ -132,11 +147,13 @@ struct State<'a> {
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
     size: winit::dpi::PhysicalSize<u32>,
+    dot_size: f32,
 }
 
 impl<'a> State<'a> {
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
+        let dot_size = DEFAULT_DOT_SIZE;
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             dx12_shader_compiler: Default::default(),
@@ -144,22 +161,28 @@ impl<'a> State<'a> {
             gles_minor_version: wgpu::Gles3MinorVersion::default(),
         });
 
-        let surface =  instance.create_surface(Arc::clone(&window)).unwrap();
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }).await.unwrap();
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap();
 
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-                memory_hints: Default::default(),
-            },
-            None,
-        ).await.unwrap();
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: Default::default(),
+                },
+                None,
+            )
+            .await
+            .unwrap();
 
         let surface_caps = surface.get_capabilities(&adapter);
         let format = surface_caps.formats[0];
@@ -196,7 +219,6 @@ impl<'a> State<'a> {
             }],
         });
 
-
         // Create pipeline layout
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -215,18 +237,11 @@ impl<'a> State<'a> {
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &[
-                        wgpu::VertexAttribute {
-                            offset: 0,
-                            shader_location: 0,
-                            format: wgpu::VertexFormat::Float32x2,
-                        },
-                        wgpu::VertexAttribute {
-                            offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
-                            shader_location: 1,
-                            format: wgpu::VertexFormat::Float32x3,
-                        },
-                    ],
+                    attributes: &[wgpu::VertexAttribute {
+                        offset: 0,
+                        shader_location: 0,
+                        format: wgpu::VertexFormat::Float32x2,
+                    }],
                 }],
             },
             fragment: Some(wgpu::FragmentState {
@@ -260,6 +275,7 @@ impl<'a> State<'a> {
         let uniforms = Uniforms {
             matrix: create_orthographic_matrix(0.0, size.width as f32, 0.0, size.height as f32),
             size: [size.width as f32, size.height as f32, 0.0, 0.0],
+            dot_size: [dot_size, dot_size, 0.0, 0.0],
             color: [0.0, 0.5, 0.0, 0.8],
             color_bg: [0.5, 0.0, 0.0, 0.8],
         };
@@ -279,7 +295,6 @@ impl<'a> State<'a> {
             }],
         });
 
-
         Self {
             surface,
             device,
@@ -290,6 +305,7 @@ impl<'a> State<'a> {
             uniform_buffer,
             uniform_bind_group,
             size,
+            dot_size,
         }
     }
 
@@ -301,24 +317,34 @@ impl<'a> State<'a> {
             self.surface.configure(&self.device, &self.config);
 
             let uniforms = Uniforms {
-                matrix: create_orthographic_matrix(0.0, new_size.width as f32, 0.0, new_size.height as f32),
+                matrix: create_orthographic_matrix(
+                    0.0,
+                    new_size.width as f32,
+                    0.0,
+                    new_size.height as f32,
+                ),
                 size: [new_size.width as f32, new_size.height as f32, 0.0, 0.0],
+                dot_size: [self.dot_size, self.dot_size, 0.0, 0.0],
                 color: [0.0, 0.5, 0.0, 0.8],
                 color_bg: [0.5, 0.0, 0.0, 0.8],
             };
 
-            self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+            self.queue
+                .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
         }
     }
 
-
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -384,8 +410,6 @@ impl<'a> State<'a> {
 //     });
 // }
 
-
-
 #[derive(Default)]
 struct App<'a> {
     window: Option<Arc<Window>>,
@@ -395,9 +419,11 @@ struct App<'a> {
 impl ApplicationHandler for App<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_none() {
-            let window = Arc::new(event_loop
-            .create_window(Window::default_attributes())
-                .unwrap());
+            let window = Arc::new(
+                event_loop
+                    .create_window(Window::default_attributes())
+                    .unwrap(),
+            );
             self.window = Some(window.clone());
 
             let state = pollster::block_on(State::new(window.clone()));
