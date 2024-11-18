@@ -8,15 +8,15 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = [ "native", "premium" ]
-native = [ "tokio/rt-multi-thread", "tokio/macros" ]
+default = ["native", "premium"]
+native = ["tokio/rt-multi-thread", "tokio/macros"]
 premium = []
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = {version = "0.2.84", optional = true}
-js-sys = {version = "0.3.68", optional = true}
+wasm-bindgen = { version = "0.2.84", optional = true }
+js-sys = { version = "0.3.68", optional = true }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -36,6 +36,8 @@ rand = "0.8.5"
 env_logger = "0.11.5"
 futures-intrusive = "0.5.0"
 flume = "0.11.1"
+zip = { version = "2.2.0", default-features = false, features = ["deflate"] }
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }
