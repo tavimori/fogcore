@@ -21,26 +21,24 @@ struct City {
     zoom: i16,
 }
 
-fn generate_composed_image_with_white_background(image: &Vec<u8>) -> Vec<u8> {
-    let pixmap = tiny_skia::Pixmap::decode_png(image).unwrap();
-    let mut white_background = tiny_skia::Pixmap::new(pixmap.width(), pixmap.height()).unwrap();
-    white_background.fill(tiny_skia::Color::WHITE);
-    white_background.draw_pixmap(
-        0,
-        0,
-        pixmap.as_ref(),
-        &tiny_skia::PixmapPaint::default(),
-        tiny_skia::Transform::identity(),
-        None,
-    );
-    white_background.encode_png().unwrap()
+fn generate_composed_image_with_white_background(png_data: &Vec<u8>) -> image::RgbaImage {
+    let img = image::load_from_memory(png_data).unwrap();
+    let rgba_img = img.to_rgba8();
+    
+    // Create new white background image
+    let mut white_background = image::RgbaImage::new(rgba_img.width(), rgba_img.height());
+    white_background.pixels_mut().for_each(|p| *p = image::Rgba([255, 255, 255, 255]));
+    
+    // Composite the original image over the white background
+    image::imageops::overlay(&mut white_background, &rgba_img, 0, 0);
+    
+    white_background
 }
 
-fn verify_image(name: &str, image: &Vec<u8>) {
-    // Always save the image file
+fn verify_image(name: &str, img: &image::RgbaImage) {
+    // Save the image file
     let output_path = format!("tests/outputs/{}.png", name);
-    let mut file = File::create(&output_path).expect("Failed to create file");
-    file.write_all(image).expect("Failed to write to file");
+    img.save(&output_path).expect("Failed to save image");
     println!("Saved image file: {}", output_path);
 
     let hash_table_path = "tests/image_hashes.json";
@@ -52,9 +50,9 @@ fn verify_image(name: &str, image: &Vec<u8>) {
         HashMap::new()
     };
 
-    // Calculate hash of the current image
+    // Calculate hash of the raw image data
     let mut hasher = Sha256::new();
-    hasher.update(image);
+    hasher.update(img.as_raw());
     let current_hash = format!("{:x}", hasher.finalize());
 
     if let Some(stored_hash) = hash_table.get(name) {
@@ -120,7 +118,8 @@ fn main() {
         let renderer = TileRendererBasic::new(TileSize::TileSize256);
         let image = renderer.render_image(&fogmap, tile_x, tile_y, city.zoom, bg_color, fg_color);
         let png = image_to_png_data(&image);
-        verify_image(city.name, &png);
+        let composed_image = generate_composed_image_with_white_background(&png);
+        verify_image(city.name, &composed_image);
     }
 
     // You can add assertions here to verify the output if needed
@@ -151,22 +150,22 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_256", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererBasic::new(TileSize::TileSize512)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_512", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererBasic::new(TileSize::TileSize1024)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_1024", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_1024", &composed_image);
 
     // GPU rendering with high-DPI
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
@@ -175,8 +174,8 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
         TileSize::TileSize512,
@@ -184,8 +183,8 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
         TileSize::TileSize1024,
@@ -193,10 +192,10 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
     verify_image(
         "different_size_rendering_shenzhen_1024_hidpi",
-        &composed_png,
+        &composed_image,
     );
 
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
@@ -205,8 +204,8 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_256_wgpu", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256_wgpu", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
         TileSize::TileSize512,
@@ -214,8 +213,8 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_512_wgpu", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512_wgpu", &composed_image);
 
     rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
         TileSize::TileSize1024,
@@ -223,7 +222,7 @@ fn test_different_size_rendering() {
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
-    let composed_png = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_1024_wgpu", &composed_png);
+    let composed_image = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_1024_wgpu", &composed_image);
 
 }
