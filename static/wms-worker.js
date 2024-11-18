@@ -1,8 +1,8 @@
-import init, { FogMap, FogRenderer, GpuFogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
+import init, { FogMap, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
 
-let fogMap, fogRenderer, gpuFogRenderer;
+let fogMap;
 
-const TILE_WIDTH = 1024;
+const TILE_WIDTH = 512;
 
 async function loadFile(filename) {
     const response = await fetch(`tiles/${filename}`);
@@ -12,7 +12,7 @@ async function loadFile(filename) {
 
 async function initializeFogMap() {
     await init();
-    let fogMap = new FogMap();
+    let fogMap = await FogMap.new();
     
     const files = [
         '2573lljsijod',    
@@ -47,9 +47,6 @@ self.addEventListener('activate', event => {
     event.waitUntil((async () => {
         await self.clients.claim();
         fogMap = await initializeFogMap();
-        fogRenderer = new FogRenderer();
-        console.log(`current fog renderer: ${fogRenderer}`);
-        gpuFogRenderer = await GpuFogRenderer.create(1024, 1024);
     })());
 });
 
@@ -62,6 +59,7 @@ self.addEventListener('fetch', event => {
 
 async function generateCustomTile(url) {
     const [, , z, x, y] = url.pathname.split('/');
+    const time = new URL(url).searchParams.get('t');
     const canvas = new OffscreenCanvas(TILE_WIDTH, TILE_WIDTH);
     const ctx = canvas.getContext('2d');
 
@@ -70,13 +68,13 @@ async function generateCustomTile(url) {
     ctx.fillRect(0, 0, TILE_WIDTH, TILE_WIDTH);
 
     // Render the fog image
-    let cpuPngData = fogRenderer.render_image_raw(fogMap, x, y, z);
+    let imageBufferRaw = await fogMap.render_image(x, y, z);
 
     // Create an ImageData object from the PNG data
-    let uint8Array = new Uint8ClampedArray(cpuPngData);
+    let uint8Array = new Uint8ClampedArray(imageBufferRaw);
     let imageData = new ImageData(uint8Array, TILE_WIDTH, TILE_WIDTH);
 
-    // // Draw the fog image onto the canvas
+    // Draw the fog image onto the canvas
     ctx.putImageData(imageData, 0, 0);
 
     // Add border
@@ -84,12 +82,14 @@ async function generateCustomTile(url) {
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, TILE_WIDTH, TILE_WIDTH);
 
-    // Write tile parameters
+    // Write tile parameters and time
     ctx.fillStyle = 'black';
-    ctx.font = '96px Arial';
+    ctx.font = '36px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(`Tile: ${x}, ${y}`, 512, 356);
-    ctx.fillText(`Zoom: ${z}`, 512, 600);
+    ctx.fillText(`TileX: ${x}`, TILE_WIDTH / 2, 100);
+    ctx.fillText(`TileY: ${y}`, TILE_WIDTH / 2, 150);
+    ctx.fillText(`Zoom: ${z}`, TILE_WIDTH / 2, 200);
+    // ctx.fillText(`Time: ${time}`, 512, 484);
 
     // Convert canvas to blob
     const blob = await canvas.convertToBlob({type: 'image/png'});

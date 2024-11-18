@@ -18,8 +18,9 @@ pub const DEFAULT_FG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
 // TODO: make this consistant (currently these two are different)
 // currently TileSize512 is used in rendered map, modify it to match with the default here.
+// https://docs.mapbox.com/help/glossary/zoom-level/#tile-size
 pub const DEFAULT_VIEW_SIZE_POWER: i16 = 8;
-pub const DEFAULT_TILE_SIZE: TileSize = TileSize::TileSize256;
+pub const DEFAULT_TILE_SIZE: TileSize = TileSize::TileSize512;
 
 #[derive(Debug, Copy, Clone)]
 pub enum TileSize {

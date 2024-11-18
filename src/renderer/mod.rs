@@ -1,6 +1,4 @@
 pub mod renderer_basic;
-#[cfg(feature = "premium")]
-pub mod renderer_premium;
 pub mod tile_shader;
 
 pub use tile_shader::TileShader;
@@ -14,7 +12,9 @@ pub use renderer_premium2::TileRendererPremium2;
 pub use renderer_basic::TileRendererBasic;
 pub use renderer_basic::TileRendererTrait;
 
-#[cfg(feature = "premium")]
+#[cfg(feature = "native")]
+pub mod renderer_premium;
+#[cfg(feature = "native")]
 pub use renderer_premium::TileRendererPremium;
 
 #[cfg(feature = "native")]

@@ -121,140 +121,10 @@ impl TileRendererTrait for TileRendererPremium2 {
         bg_color: Rgba<u8>,
         fg_color: Rgba<u8>,
     ) {
-        // Update uniforms for this specific tile
-        self.update_uniforms(start_x, start_y, bg_color, fg_color);
-
-        // check the image size
-        let tile_size = self.get_tile_size().size();
-        debug_assert!(image.width() >= start_x + self.get_tile_size().size() as u32);
-        debug_assert!(image.height() >= start_y + self.get_tile_size().size() as u32);
-
-        // currently the gpu shading cannot be applied in-place
-        let mut pixels_coordinates = TileShader2::get_pixels_coordinates(
-            start_x,
-            start_y,
-            fogmap,
-            view_x,
-            view_y,
-            zoom,
-            self.tile_size.power(),
-        );
-
-        if pixels_coordinates.len() == 0 {
-            // FIXME: this is a hack to avoid the shader from crashing when there are no pixels to render
-            pixels_coordinates.push(-1.0);
-            pixels_coordinates.push(-1.0);
-        }
-
-        let num_pixels = pixels_coordinates.len() / 2;
-
-        // Create texture for offscreen rendering
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Texture"),
-            size: wgpu::Extent3d {
-                width: tile_size,
-                height: tile_size,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: self.texture_format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
+        let rendered_image = pollster::block_on(async move {
+            self.render_image_async(fogmap, view_x, view_y, zoom, bg_color, fg_color)
+                .await
         });
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // Create output buffer for reading pixels
-        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Output Buffer"),
-            size: (tile_size * tile_size * 4) as u64,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        // Create vertex buffer
-        let vertex_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(&pixels_coordinates),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: bg_color.channels()[0] as f64 / 255.0,
-                            g: bg_color.channels()[1] as f64 / 255.0,
-                            b: bg_color.channels()[2] as f64 / 255.0,
-                            a: bg_color.channels()[3] as f64 / 255.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            render_pass.draw(0..6, 0..num_pixels as u32);
-        }
-
-        // Copy texture to buffer
-        encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTexture {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::ImageCopyBuffer {
-                buffer: &output_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(tile_size * 4),
-                    rows_per_image: Some(tile_size),
-                },
-            },
-            wgpu::Extent3d {
-                width: tile_size,
-                height: tile_size,
-                depth_or_array_layers: 1,
-            },
-        );
-
-        self.queue.submit(iter::once(encoder.finish()));
-
-        // Read the buffer - modified to handle lifetimes correctly
-        let buffer_slice = output_buffer.slice(..);
-        let (tx, rx) = std::sync::mpsc::channel();
-        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            tx.send(result).unwrap();
-        });
-        self.device.poll(wgpu::Maintain::Wait);
-        rx.recv().unwrap().unwrap();
-
-        // Create the vector before dropping the buffer
-        let data = buffer_slice.get_mapped_range().to_vec();
-
-        let rendered_image = RgbaImage::from_raw(tile_size, tile_size, data).unwrap();
-
         let _ = image.copy_from(&rendered_image, start_x, start_y);
     }
 }
@@ -278,8 +148,22 @@ impl TileRendererPremium2 {
                 compatible_surface: None,
                 force_fallback_adapter: false,
             })
-            .await
-            .unwrap();
+            .await;
+
+        let adapter = match adapter {
+            Some(adapter) => adapter,
+            None => {
+                // If no adapter is found, try again with force_fallback_adapter set to true
+                instance
+                    .request_adapter(&wgpu::RequestAdapterOptions {
+                        power_preference: wgpu::PowerPreference::LowPower,
+                        compatible_surface: None,
+                        force_fallback_adapter: true,
+                    })
+                    .await
+                    .expect("Failed to find an appropriate adapter")
+            }
+        };
 
         let (device, queue) = adapter
             .request_device(
@@ -429,6 +313,159 @@ impl TileRendererPremium2 {
         // Update the uniform buffer with new values
         self.queue
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+    }
+
+    pub async fn render_image_async(
+        &self,
+        fogmap: &FogMap,
+        view_x: i64,
+        view_y: i64,
+        zoom: i16,
+        bg_color: Rgba<u8>,
+        fg_color: Rgba<u8>,
+    ) -> RgbaImage {
+        let mut image = RgbaImage::new(
+            self.get_tile_size().size() as u32,
+            self.get_tile_size().size() as u32,
+        );
+        let start_x = 0;
+        let start_y = 0;
+        // Update uniforms for this specific tile
+        self.update_uniforms(start_x, start_y, bg_color, fg_color);
+
+        // check the image size
+        let tile_size = self.get_tile_size().size();
+        debug_assert!(image.width() >= start_x + self.get_tile_size().size() as u32);
+        debug_assert!(image.height() >= start_y + self.get_tile_size().size() as u32);
+
+        // currently the gpu shading cannot be applied in-place
+        let mut pixels_coordinates = TileShader2::get_pixels_coordinates(
+            start_x,
+            start_y,
+            fogmap,
+            view_x,
+            view_y,
+            zoom,
+            self.tile_size.power(),
+        );
+
+        if pixels_coordinates.len() == 0 {
+            // FIXME: this is a hack to avoid the shader from crashing when there are no pixels to render
+            pixels_coordinates.push(-1.0);
+            pixels_coordinates.push(-1.0);
+        }
+
+        let num_pixels = pixels_coordinates.len() / 2;
+
+        // Create texture for offscreen rendering
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Texture"),
+            size: wgpu::Extent3d {
+                width: tile_size,
+                height: tile_size,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.texture_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create output buffer for reading pixels
+        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Output Buffer"),
+            size: (tile_size * tile_size * 4) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        // Create vertex buffer
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&pixels_coordinates),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: bg_color.channels()[0] as f64 / 255.0,
+                            g: bg_color.channels()[1] as f64 / 255.0,
+                            b: bg_color.channels()[2] as f64 / 255.0,
+                            a: bg_color.channels()[3] as f64 / 255.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            render_pass.draw(0..6, 0..num_pixels as u32);
+        }
+
+        // Copy texture to buffer
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &output_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(tile_size * 4),
+                    rows_per_image: Some(tile_size),
+                },
+            },
+            wgpu::Extent3d {
+                width: tile_size,
+                height: tile_size,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(iter::once(encoder.finish()));
+
+        // Read the buffer - modified to handle lifetimes correctly
+        let buffer_slice = output_buffer.slice(..);
+        let (sender, receiver) = flume::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            sender.send(result).unwrap();
+        });
+        self.device.poll(wgpu::Maintain::Wait);
+        receiver.recv_async().await.unwrap().unwrap();
+
+        // Create the vector before dropping the buffer
+        let data = buffer_slice.get_mapped_range().to_vec();
+
+        let rendered_image = RgbaImage::from_raw(tile_size, tile_size, data).unwrap();
+
+        let _ = image.copy_from(&rendered_image, start_x, start_y);
+        image
     }
 }
 

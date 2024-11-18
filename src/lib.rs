@@ -17,6 +17,7 @@ mod logging;
 pub use renderer::TileShader;
 pub use renderer::TileRendererBasic;
 pub use renderer::TileRendererTrait;
+#[cfg(feature = "native")]
 pub use renderer::TileRendererPremium;
 pub use renderer::TileRendererPremium2;
 

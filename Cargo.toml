@@ -35,9 +35,12 @@ winit = "0.30.5"
 pollster = "0.4.0"
 rand = "0.8.5"
 env_logger = "0.11.5"
+futures-intrusive = "0.5.0"
+flume = "0.11.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }
+getrandom = { version = "0.2.15", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
