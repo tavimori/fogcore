@@ -1,6 +1,7 @@
 import init, { FogMap, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
 
 let fogMap;
+let fogMapInitialization = null;
 
 const TILE_WIDTH = 512;
 
@@ -11,21 +12,28 @@ async function loadZip(filename ) {
 }
 
 async function initializeFogMap() {
-    await init();
-    let fogMap = await FogMap.new();
-
-    try {
-        console.log('Loading tiles.zip');
-        const filename = 'tiles.zip';
-        const data = await loadZip(filename);
-        fogMap.add_fow_zip(data);
-        console.log(`Loaded ${filename}`);
-    } catch (error) {
-        console.error(`Failed to load ${filename}:`, error);
+    if (fogMapInitialization) {
+        return fogMapInitialization;
     }
 
+    fogMapInitialization = (async () => {
+        await init();
+        let newFogMap = await FogMap.new();
 
-    return fogMap;
+        try {
+            console.log('Loading tiles.zip');
+            const filename = 'tiles.zip';
+            const data = await loadZip(filename);
+            newFogMap.add_fow_zip(data);
+            console.log(`Loaded ${filename}`);
+            return newFogMap;
+        } catch (error) {
+            console.error(`Failed to load ${filename}:`, error);
+            throw error;
+        }
+    })();
+
+    return fogMapInitialization;
 }
 
 export async function initializeWorker() {
@@ -51,6 +59,10 @@ self.addEventListener('fetch', event => {
 });
 
 async function generateCustomTile(url) {
+    if (!fogMap) {
+        fogMap = await initializeFogMap();
+    }
+    
     const [, , z, x, y] = url.pathname.split('/');
     const time = new URL(url).searchParams.get('t');
     const canvas = new OffscreenCanvas(TILE_WIDTH, TILE_WIDTH);
