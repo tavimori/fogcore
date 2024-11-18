@@ -9,10 +9,6 @@ use std::io::Cursor;
 use std::io::Read;
 use std::path::Path;
 
-// TODO: unify the color type to `Rgba<u8>`
-pub const DEFAULT_BG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 127);
-pub const DEFAULT_FG_COLOR: tiny_skia::ColorU8 = tiny_skia::ColorU8::from_rgba(0, 0, 0, 0);
-
 pub const DEFAULT_BG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 127]);
 pub const DEFAULT_FG_COLOR2: Rgba<u8> = Rgba([0, 0, 0, 0]);
 
