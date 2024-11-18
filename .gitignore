@@ -5,3 +5,7 @@ bin/
 pkg/
 wasm-pack.log
 image*.png
+
+.DS_Store
+
+.vscode
