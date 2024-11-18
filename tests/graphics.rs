@@ -37,6 +37,12 @@ fn generate_composed_image_with_white_background(image: &Vec<u8>) -> Vec<u8> {
 }
 
 fn verify_image(name: &str, image: &Vec<u8>) {
+    // Always save the image file
+    let output_path = format!("tests/outputs/{}.png", name);
+    let mut file = File::create(&output_path).expect("Failed to create file");
+    file.write_all(image).expect("Failed to write to file");
+    println!("Saved image file: {}", output_path);
+
     let hash_table_path = "tests/image_hashes.json";
     let mut hash_table: HashMap<String, String> = if Path::new(hash_table_path).exists() {
         let hash_table_content =
@@ -67,12 +73,6 @@ fn verify_image(name: &str, image: &Vec<u8>) {
         fs::write(hash_table_path, hash_table_content).expect("Failed to write hash table file");
         println!("Added new hash entry for: {}", name);
     }
-
-    // Always save the image file
-    let output_path = format!("tests/outputs/{}.png", name);
-    let mut file = File::create(&output_path).expect("Failed to create file");
-    file.write_all(image).expect("Failed to write to file");
-    println!("Saved image file: {}", output_path);
 }
 
 #[test]
