@@ -9,7 +9,14 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["native", "premium"]
-native = ["tokio/rt-multi-thread", "tokio/macros"]
+native = [
+    "tokio/rt-multi-thread",
+    "tokio/macros",
+    "actix-web",
+    "actix-web-actors",
+    "actix",
+    "serde",
+]
 premium = []
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
@@ -37,7 +44,11 @@ env_logger = "0.11.5"
 futures-intrusive = "0.5.0"
 flume = "0.11.1"
 zip = { version = "2.2.0", default-features = false, features = ["deflate"] }
-
+serde = { version = "1.0.215", optional = true }
+actix-web = { version = "4.9.0", optional = true }
+actix-web-actors = { version = "4.3.1", optional = true }
+actix = { version = "0.13.5", optional = true }
+serde_json = "1.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }
@@ -46,7 +57,7 @@ getrandom = { version = "0.2.15", features = ["js"] }
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
 criterion = { version = "0.5", features = ["html_reports"] }
-serde_json = "1.0"
+
 sha2 = "0.10"
 
 [profile.release]

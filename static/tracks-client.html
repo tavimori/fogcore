@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Track Map</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id='map'></div>
+    <script>
+        // Replace with your Mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-74.5, 40],
+            zoom: 9
+        });
+
+        // WebSocket connection
+        const ws = new WebSocket('ws://localhost:5503/ws');
+        
+        ws.onopen = function() {
+            console.log('Connected to server');
+        };
+
+        ws.onmessage = function(event) {
+            const command = JSON.parse(event.data);
+            
+            if (command.command === 'fly_to') {
+                map.flyTo({
+                    center: [command.lng, command.lat],
+                    zoom: command.zoom || map.getZoom(),
+                    essential: true
+                });
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('Disconnected from server');
+        };
+    </script>
+</body>
+</html>
