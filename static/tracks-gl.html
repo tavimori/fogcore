@@ -36,6 +36,12 @@
             projection: 'mercator'
         });
 
+        function get_bounding_mercator_pixels() {
+            const pixels = [0.5, 0.5, 0.4, 0.4];
+            
+            return pixels;
+        }
+
         // Custom layer implementation
         const customLayer = {
             id: 'custom-layer',
@@ -47,15 +53,23 @@
             onAdd: function (map, gl) {
                 // create GLSL source for vertex shader
                 const vertexSource = `
+                precision mediump float;
                 uniform mat4 u_matrix;
                 attribute vec2 a_pos;
                 void main() {
                     gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+                    gl_PointSize = 100.0;
                 }`;
 
                 // create GLSL source for fragment shader
                 const fragmentSource = `
+                precision mediump float;
                 void main() {
+                    vec2 center = gl_PointCoord - vec2(0.5);
+                    float dist = length(center);
+                    if (dist > 0.5) {
+                        discard;
+                    }
                     gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
                 }`;
 
@@ -64,10 +78,22 @@
                 gl.shaderSource(vertexShader, vertexSource);
                 gl.compileShader(vertexShader);
 
+                // Check vertex shader compilation
+                if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                    console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
+                    return;
+                }
+
                 // create a fragment shader
                 const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
                 gl.shaderSource(fragmentShader, fragmentSource);
                 gl.compileShader(fragmentShader);
+
+                // Check fragment shader compilation
+                if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+                    console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
+                    return;
+                }
 
                 // link the two shaders into a WebGL program
                 this.program = gl.createProgram();
@@ -143,7 +169,7 @@
                 const bounds = mercatorCorners.map(coord => coord.toLngLat());
                 
                 // Log mercatorCorners
-                console.log('Mercator corners:', mercatorCorners);
+                // console.log('Mercator corners:', mercatorCorners);
 
                 // Log the bounds
                 // console.log('Viewport bounds:', {
@@ -165,7 +191,7 @@
                 gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+                gl.drawArrays(gl.POINTS, 0, 3);
             }
         };
 
