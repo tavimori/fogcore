@@ -16,6 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    # For wgpu rendering
+    - name: Install Mesa for software rendering
+      run: sudo apt-get install -y mesa-utils libgl1-mesa-dri
+
     - uses: Swatinem/rust-cache@v2
     - uses: cargo-bins/cargo-binstall@main
     - name: Build

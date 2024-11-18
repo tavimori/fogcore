@@ -19,6 +19,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    # For wgpu rendering
+    - name: Install Mesa for software rendering
+      run: sudo apt-get install -y mesa-utils libgl1-mesa-dri
+
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
