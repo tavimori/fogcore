@@ -47,8 +47,8 @@ impl TileRendererTrait for TileRendererPremium {
     ) {
         // check the image size
         let tile_size = self.get_tile_size().size();
-        debug_assert!(image.width() >= start_x + self.get_tile_size().size() as u32);
-        debug_assert!(image.height() >= start_y + self.get_tile_size().size() as u32);
+        debug_assert!(image.width() >= start_x + self.get_tile_size().size());
+        debug_assert!(image.height() >= start_y + self.get_tile_size().size());
 
         // currently the gpu shading cannot be applied in-place
         let temp_image = self
@@ -75,8 +75,8 @@ impl TileRendererPremium {
     }
 
     pub async fn new_async(tile_size: TileSize) -> Self {
-        let width = tile_size.size() as u32;
-        let height = tile_size.size() as u32;
+        let width = tile_size.size();
+        let height = tile_size.size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
@@ -119,7 +119,7 @@ impl TileRendererPremium {
                     memory_hints: Default::default(),
                 },
                 // None,
-                Some(&std::path::Path::new("trace")),
+                Some(std::path::Path::new("trace")),
             )
             .await
             .unwrap();

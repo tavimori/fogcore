@@ -22,6 +22,7 @@ impl TileShader {
     // TODO: may use mipmap to accelerate the rendering.
     // TODO: currently if a pixel contains multiple tile / block, the rendering process will write over the pixel multiple times, may use other interpolation method.
     // We use a method called max-pooling interpolation to enlarge the tracks while keeping them easy to see at different sizes.
+    #[allow(clippy::too_many_arguments)]
     pub fn render_on_image(
         image: &mut RgbaImage,
         start_x: u32,
@@ -104,6 +105,7 @@ impl TileShader {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_tile_on_pixels(
         tile: &Tile,
         sub_image: &mut SubImage<&mut RgbaImage>,
@@ -182,6 +184,7 @@ impl TileShader {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_block_on_pixels(
         block: &Block,
         sub_image: &mut SubImage<&mut RgbaImage>,

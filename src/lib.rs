@@ -14,13 +14,12 @@ pub mod wasm;
 
 mod logging;
 
-pub use renderer::TileShader;
 pub use renderer::TileRendererBasic;
-pub use renderer::TileRendererTrait;
 #[cfg(feature = "native")]
 pub use renderer::TileRendererPremium;
 pub use renderer::TileRendererPremium2;
+pub use renderer::TileRendererTrait;
+pub use renderer::TileShader;
 
 pub use fogmaps::FogMap;
 pub use utils::*;
-

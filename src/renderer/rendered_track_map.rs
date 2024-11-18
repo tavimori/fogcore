@@ -47,6 +47,12 @@ pub struct RenderedTrackMap {
     current_render_area: Option<RenderArea>,
 }
 
+impl Default for RenderedTrackMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RenderedTrackMap {
     pub fn new() -> Self {
         let track_map = FogMap::new();
@@ -160,7 +166,7 @@ impl RenderedTrackMap {
 
         // TODO: There is a hack to make sure we always cover a bit bigger to
         // avoid the gap between user move to new area and drawing that area.
-        let n = f64::powi(2.0, zoom.into()) as i32;
+        let n = f64::powi(2.0, zoom) as i32;
         top_idx = std::cmp::max(top_idx - 1, 0);
         bottom_idx = std::cmp::min(bottom_idx + 1, n - 1);
         left_idx -= 1;

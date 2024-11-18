@@ -8,7 +8,6 @@ extern crate console_error_panic_hook;
 use js_sys::Promise;
 use wasm_bindgen_futures::future_to_promise;
 
-
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -45,14 +44,17 @@ impl FogMap {
 
     #[wasm_bindgen]
     pub async fn render_image(&self, view_x: i64, view_y: i64, zoom: i16) -> Vec<u8> {
-            let image = self.renderer.render_image_async(
+        let image = self
+            .renderer
+            .render_image_async(
                 &self.fogmap,
                 view_x,
                 view_y,
                 zoom,
                 DEFAULT_BG_COLOR2,
                 DEFAULT_FG_COLOR2,
-            ).await;
-            image.into_vec()
+            )
+            .await;
+        image.into_vec()
     }
 }

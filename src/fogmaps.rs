@@ -20,6 +20,7 @@ pub const BITMAP_WIDTH: i64 = 1 << BITMAP_WIDTH_OFFSET;
 const ALL_OFFSET: i16 = TILE_WIDTH_OFFSET + BITMAP_WIDTH_OFFSET;
 
 /// An in-memory efficient representation of a persons tracks on the Earth.
+#[derive(Default)]
 pub struct FogMap {
     pub tiles: HashMap<(i64, i64), Tile>,
 }
@@ -55,7 +56,7 @@ impl FogMap {
 
         // println!("parsing tile x:{} y:{}", x, y);
 
-        let tile = self.tiles.entry((x, y)).or_insert(Tile::new());
+        let tile = self.tiles.entry((x, y)).or_default();
 
         let data_inflate = decompress_to_vec_zlib(&data).unwrap();
 
@@ -111,8 +112,8 @@ impl FogMap {
 
         // Iterators, counters required by algorithm
         // Calculate line deltas
-        let dx = x1 as i64 - x0 as i64;
-        let dy = y1 as i64 - y0 as i64;
+        let dx = x1 - x0;
+        let dy = y1 - y0;
         // Create a positive copy of deltas (makes iterating easier)
         let dx0 = dx.abs();
         let dy0 = dy.abs();
@@ -131,10 +132,7 @@ impl FogMap {
             while x < xe {
                 // tile_x is not rounded, it may exceed the antimeridian
                 let (tile_x, tile_y) = (x >> ALL_OFFSET, y >> ALL_OFFSET);
-                let tile = self
-                    .tiles
-                    .entry((tile_x % MAP_WIDTH, tile_y))
-                    .or_insert(Tile::new());
+                let tile = self.tiles.entry((tile_x % MAP_WIDTH, tile_y)).or_default();
                 (x, y, px) = tile.add_line(
                     x - (tile_x << ALL_OFFSET),
                     y - (tile_y << ALL_OFFSET),
@@ -160,10 +158,7 @@ impl FogMap {
             while y < ye {
                 // tile_x is not rounded, it may exceed the antimeridian
                 let (tile_x, tile_y) = (x >> ALL_OFFSET, y >> ALL_OFFSET);
-                let tile = self
-                    .tiles
-                    .entry((tile_x % MAP_WIDTH, tile_y))
-                    .or_insert(Tile::new());
+                let tile = self.tiles.entry((tile_x % MAP_WIDTH, tile_y)).or_default();
                 (x, y, py) = tile.add_line(
                     x - (tile_x << ALL_OFFSET),
                     y - (tile_y << ALL_OFFSET),
@@ -186,6 +181,12 @@ pub struct Tile {
     // if we allow removing blocks, we need to make sure the blocks_key is updated accordingly.
     blocks_key: Vec<i16>,
     blocks_buffer: Vec<Option<Block>>,
+}
+
+impl Default for Tile {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Tile {
@@ -228,6 +229,7 @@ impl Tile {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_line(
         &mut self,
         x: i64,
@@ -301,6 +303,7 @@ impl Tile {
     }
 }
 
+#[derive(Default)]
 pub struct Block {
     data: Vec<u8>,
 }
@@ -333,6 +336,7 @@ impl Block {
     }
 
     // a modified Bresenham algorithm with initialized error from upper layer
+    #[allow(clippy::too_many_arguments)]
     fn add_line(
         &mut self,
         x: i64,
@@ -356,20 +360,20 @@ impl Block {
         if xaxis {
             // Rasterize the line
             while x < e {
-                x = x + 1;
+                x += 1;
                 // Deal with octants...
                 if p < 0 {
-                    p = p + 2 * dy0;
+                    p += 2 * dy0;
                 } else {
                     if quadrants13 {
-                        y = y + 1;
+                        y += 1;
                     } else {
-                        y = y - 1;
+                        y -= 1;
                     }
-                    p = p + 2 * (dy0 - dx0);
+                    p += 2 * (dy0 - dx0);
                 }
 
-                if x >= BITMAP_WIDTH || y < 0 || y >= BITMAP_WIDTH {
+                if x >= BITMAP_WIDTH || !(0..BITMAP_WIDTH).contains(&y) {
                     break;
                 }
                 // Draw pixel from line span at
@@ -380,20 +384,20 @@ impl Block {
             // The line is Y-axis dominant
             // Rasterize the line
             while y < e {
-                y = y + 1;
+                y += 1;
                 // Deal with octants...
                 if p <= 0 {
-                    p = p + 2 * dx0;
+                    p += 2 * dx0;
                 } else {
                     if quadrants13 {
-                        x = x + 1;
+                        x += 1;
                     } else {
-                        x = x - 1;
+                        x -= 1;
                     }
-                    p = p + 2 * (dx0 - dy0);
+                    p += 2 * (dx0 - dy0);
                 }
 
-                if y >= BITMAP_WIDTH || x < 0 || x >= BITMAP_WIDTH {
+                if y >= BITMAP_WIDTH || !(0..BITMAP_WIDTH).contains(&x) {
                     break;
                 }
                 // Draw pixel from line span at

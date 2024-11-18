@@ -24,14 +24,16 @@ struct City {
 fn generate_composed_image_with_white_background(png_data: &Vec<u8>) -> image::RgbaImage {
     let img = image::load_from_memory(png_data).unwrap();
     let rgba_img = img.to_rgba8();
-    
+
     // Create new white background image
     let mut white_background = image::RgbaImage::new(rgba_img.width(), rgba_img.height());
-    white_background.pixels_mut().for_each(|p| *p = image::Rgba([255, 255, 255, 255]));
-    
+    white_background
+        .pixels_mut()
+        .for_each(|p| *p = image::Rgba([255, 255, 255, 255]));
+
     // Composite the original image over the white background
     image::imageops::overlay(&mut white_background, &rgba_img, 0, 0);
-    
+
     white_background
 }
 
@@ -168,27 +170,27 @@ fn test_different_size_rendering() {
     verify_image("different_size_rendering_shenzhen_1024", &composed_image);
 
     // GPU rendering with high-DPI
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
-        TileSize::TileSize256,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(TileSize::TileSize256)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_image = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_image);
+    verify_image(
+        "different_size_rendering_shenzhen_256_hidpi",
+        &composed_image,
+    );
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
-        TileSize::TileSize512,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(TileSize::TileSize512)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_image = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_image);
+    verify_image(
+        "different_size_rendering_shenzhen_512_hidpi",
+        &composed_image,
+    );
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
-        TileSize::TileSize1024,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(TileSize::TileSize1024)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
@@ -198,31 +200,33 @@ fn test_different_size_rendering() {
         &composed_image,
     );
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
-        TileSize::TileSize256,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(TileSize::TileSize256)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_image = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_256_wgpu", &composed_image);
+    verify_image(
+        "different_size_rendering_shenzhen_256_wgpu",
+        &composed_image,
+    );
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
-        TileSize::TileSize512,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(TileSize::TileSize512)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_image = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_512_wgpu", &composed_image);
+    verify_image(
+        "different_size_rendering_shenzhen_512_wgpu",
+        &composed_image,
+    );
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
-        TileSize::TileSize1024,
-    )));
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(TileSize::TileSize1024)));
     let result = rendered_map
         .try_render_region_containing_bbox(bbox, 9)
         .unwrap();
     let composed_image = generate_composed_image_with_white_background(&result.data);
-    verify_image("different_size_rendering_shenzhen_1024_wgpu", &composed_image);
-
+    verify_image(
+        "different_size_rendering_shenzhen_1024_wgpu",
+        &composed_image,
+    );
 }

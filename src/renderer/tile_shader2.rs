@@ -79,6 +79,7 @@ impl TileShader2 {
         pixels
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_tile_pixels(
         pixels: &mut Vec<f32>,
         tile: &Tile,
@@ -157,6 +158,7 @@ impl TileShader2 {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_block_pixels(
         pixels: &mut Vec<f32>,
         block: &Block,

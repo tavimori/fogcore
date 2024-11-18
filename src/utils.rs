@@ -90,22 +90,20 @@ pub fn load_tracks_map_folder(tiles_dir: &str) -> FogMap {
 
     // Load tiles
     if let Ok(entries) = fs::read_dir(tiles_dir) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                        // Skip hidden files (those starting with a dot)
-                        if file_name.starts_with('.') {
-                            continue;
-                        }
-
-                        let mut tile_file = File::open(&path).unwrap();
-                        let mut content = Vec::new();
-                        tile_file.read_to_end(&mut content).unwrap();
-                        println!("Loading file: {} with length: {}", file_name, content.len());
-                        fogmap.add_fow_file(file_name, content);
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                    // Skip hidden files (those starting with a dot)
+                    if file_name.starts_with('.') {
+                        continue;
                     }
+
+                    let mut tile_file = File::open(&path).unwrap();
+                    let mut content = Vec::new();
+                    tile_file.read_to_end(&mut content).unwrap();
+                    println!("Loading file: {} with length: {}", file_name, content.len());
+                    fogmap.add_fow_file(file_name, content);
                 }
             }
         }

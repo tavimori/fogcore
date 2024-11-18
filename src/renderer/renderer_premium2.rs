@@ -324,10 +324,7 @@ impl TileRendererPremium2 {
         bg_color: Rgba<u8>,
         fg_color: Rgba<u8>,
     ) -> RgbaImage {
-        let mut image = RgbaImage::new(
-            self.get_tile_size().size() as u32,
-            self.get_tile_size().size() as u32,
-        );
+        let mut image = RgbaImage::new(self.get_tile_size().size(), self.get_tile_size().size());
         let start_x = 0;
         let start_y = 0;
         // Update uniforms for this specific tile
@@ -335,8 +332,8 @@ impl TileRendererPremium2 {
 
         // check the image size
         let tile_size = self.get_tile_size().size();
-        debug_assert!(image.width() >= start_x + self.get_tile_size().size() as u32);
-        debug_assert!(image.height() >= start_y + self.get_tile_size().size() as u32);
+        debug_assert!(image.width() >= start_x + self.get_tile_size().size());
+        debug_assert!(image.height() >= start_y + self.get_tile_size().size());
 
         // currently the gpu shading cannot be applied in-place
         let mut pixels_coordinates = TileShader2::get_pixels_coordinates(
@@ -349,7 +346,7 @@ impl TileRendererPremium2 {
             self.tile_size.power(),
         );
 
-        if pixels_coordinates.len() == 0 {
+        if pixels_coordinates.is_empty() {
             // FIXME: this is a hack to avoid the shader from crashing when there are no pixels to render
             pixels_coordinates.push(-1.0);
             pixels_coordinates.push(-1.0);
