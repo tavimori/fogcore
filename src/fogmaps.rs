@@ -1,6 +1,7 @@
 use miniz_oxide::inflate::decompress_to_vec_zlib;
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::io::Read;
 
 const FILENAME_MASK1: &str = "olhwjsktri";
 #[allow(dead_code)]
@@ -81,6 +82,43 @@ impl FogMap {
         }
 
         // println!("inflated data len: {:?}", data_inflate.len());
+    }
+
+    /// Adds tracks by importing from a zip file containing multiple FOW data files.
+    ///
+    /// This will process all files within the zip archive and attempt to import them
+    /// as FOW data files. Invalid files will be skipped.
+    pub fn add_fow_zip(&mut self, zip_data: &[u8]) -> Result<(), String> {
+        let reader = std::io::Cursor::new(zip_data);
+        let mut archive = match zip::ZipArchive::new(reader) {
+            Ok(archive) => archive,
+            Err(e) => return Err(format!("Failed to read zip file: {}", e)),
+        };
+
+        for i in 0..archive.len() {
+            let mut file = match archive.by_index(i) {
+                Ok(file) => file,
+                Err(_) => continue,
+            };
+
+            // Get just the filename part, not the full path
+            let file_name = file.name().split('/').last().unwrap_or("").to_string();
+
+            // Skip directories and non-FOW files (FOW files contain only alphanumeric characters)
+            if file.is_dir() || !file_name.chars().all(|c| c.is_alphanumeric()) {
+                continue;
+            }
+
+            let mut buffer = Vec::new();
+            if file.read_to_end(&mut buffer).is_err() {
+                continue;
+            }
+
+            // Try to add the FOW file using just the filename part
+            self.add_fow_file(&file_name, buffer);
+        }
+
+        Ok(())
     }
 
     pub fn get_tile(&self, x: i64, y: i64) -> Option<&Tile> {

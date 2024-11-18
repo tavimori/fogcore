@@ -43,6 +43,11 @@ impl FogMap {
     }
 
     #[wasm_bindgen]
+    pub fn add_fow_zip(&mut self, data: &[u8]) {
+        self.fogmap.add_fow_zip(data).unwrap();
+    }
+
+    #[wasm_bindgen]
     pub async fn render_image(&self, view_x: i64, view_y: i64, zoom: i16) -> Vec<u8> {
         let image = self
             .renderer
