@@ -280,9 +280,11 @@ impl State {
             mapped_at_creation: false,
         });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -347,7 +349,7 @@ impl State {
 
         // Create the vector before dropping the buffer
         let data = buffer_slice.get_mapped_range().to_vec();
-        
+
         // Return the data
         data
     }
@@ -359,7 +361,7 @@ fn main() {
 
     // Create image from raw pixels
     let image = image::RgbaImage::from_raw(RENDER_WIDTH, RENDER_HEIGHT, pixels).unwrap();
-    
+
     // Save to file
     image.save("output.png").unwrap();
 }
@@ -384,4 +386,3 @@ fn rgba_to_vec4(color: Rgba<u8>) -> [f32; 4] {
         color.channels()[3] as f32 / 255.0,
     ]
 }
-
