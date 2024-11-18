@@ -53,13 +53,13 @@ impl FogMap {
         let x = id % MAP_WIDTH;
         let y = id / MAP_WIDTH;
 
-        println!("parsing tile x:{} y:{}", x, y);
+        // println!("parsing tile x:{} y:{}", x, y);
 
         let tile = self.tiles.entry((x, y)).or_insert(Tile::new());
 
         let data_inflate = decompress_to_vec_zlib(&data).unwrap();
 
-        println!("inflated data len: {}", data_inflate.len());
+        // println!("inflated data len: {}", data_inflate.len());
 
         let header = &data_inflate[0..TILE_HEADER_SIZE];
 
@@ -74,12 +74,12 @@ impl FogMap {
                 let end_offset = start_offset + BLOCK_SIZE;
                 let data = data_inflate[start_offset..end_offset].to_vec();
                 let block = Block::new_with_data(data);
-                println!("inserting block {}-{}", block_x, block_y);
+                // println!("inserting block {}-{}", block_x, block_y);
                 tile.add_by_blocks(block_x, block_y, block)
             }
         }
 
-        println!("inflated data len: {:?}", data_inflate.len());
+        // println!("inflated data len: {:?}", data_inflate.len());
     }
 
     pub fn get_tile(&self, x: i64, y: i64) -> Option<&Tile> {
@@ -183,6 +183,7 @@ impl FogMap {
 
 pub struct Tile {
     // TODO: theoretically we need GC for this data structure, but in practice it is not necessary.
+    // if we allow removing blocks, we need to make sure the blocks_key is updated accordingly.
     blocks_key: Vec<i16>,
     blocks_buffer: Vec<Option<Block>>,
 }
