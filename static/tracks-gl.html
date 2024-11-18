@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8' />
+    <title>Custom GL Layer</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id='map'></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw'; // Replace with your token
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-74.5, 40],
+            zoom: 9,
+            antialias: true,
+            projection: 'mercator'
+        });
+
+        // Custom layer implementation
+        const customLayer = {
+            id: 'custom-layer',
+            type: 'custom',
+            renderingMode: '2d',
+
+            // method called when the layer is added to the map
+            // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
+            onAdd: function (map, gl) {
+                // create GLSL source for vertex shader
+                const vertexSource = `
+                uniform mat4 u_matrix;
+                attribute vec2 a_pos;
+                void main() {
+                    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+                }`;
+
+                // create GLSL source for fragment shader
+                const fragmentSource = `
+                void main() {
+                    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
+                }`;
+
+                // create a vertex shader
+                const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+                gl.shaderSource(vertexShader, vertexSource);
+                gl.compileShader(vertexShader);
+
+                // create a fragment shader
+                const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+                gl.shaderSource(fragmentShader, fragmentSource);
+                gl.compileShader(fragmentShader);
+
+                // link the two shaders into a WebGL program
+                this.program = gl.createProgram();
+                gl.attachShader(this.program, vertexShader);
+                gl.attachShader(this.program, fragmentShader);
+                gl.linkProgram(this.program);
+
+                this.aPos = gl.getAttribLocation(this.program, 'a_pos');
+
+                // define vertices of the triangle to be rendered in the custom style layer
+                const helsinki = mapboxgl.MercatorCoordinate.fromLngLat({
+                    lng: 25.004,
+                    lat: 60.239
+                });
+                const berlin = mapboxgl.MercatorCoordinate.fromLngLat({
+                    lng: 13.403,
+                    lat: 52.562
+                });
+                const kyiv = mapboxgl.MercatorCoordinate.fromLngLat({
+                    lng: 30.498,
+                    lat: 50.541
+                });
+
+                // create and initialize a WebGLBuffer to store vertex and color data
+                this.buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                gl.bufferData(
+                    gl.ARRAY_BUFFER,
+                    new Float32Array([
+                        helsinki.x,
+                        helsinki.y,
+                        berlin.x,
+                        berlin.y,
+                        kyiv.x,
+                        kyiv.y
+                    ]),
+                    gl.STATIC_DRAW
+                );
+            },
+
+            // method fired on each animation frame
+            // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
+            render: function (gl, matrix) {
+                // Create inverse matrix
+                const inverse = new Float64Array(16);
+                const det = mat4Invert(matrix, inverse);
+                
+                // Get viewport corners in clip space (-1 to 1)
+                const corners = [
+                    [-1, -1], // bottom left
+                    [1, -1],  // bottom right
+                    [-1, 1],  // top left
+                    [1, 1]    // top right
+                ];
+                
+                // Transform corners to mercator coordinates
+                const mercatorCorners = corners.map(([x, y]) => {
+                    // Homogeneous coordinates (x, y, z, w)
+                    const vec = [x, y, 0, 1];
+                    const result = [0, 0, 0, 0];
+                    
+                    // Apply inverse transform
+                    vec4Transform(inverse, vec, result);
+                    
+                    // Convert from homogeneous coordinates
+                    return new mapboxgl.MercatorCoordinate(
+                        result[0] / result[3],
+                        result[1] / result[3]
+                    );
+                });
+                
+                // Convert to LngLat
+                const bounds = mercatorCorners.map(coord => coord.toLngLat());
+                
+                // Log mercatorCorners
+                console.log('Mercator corners:', mercatorCorners);
+
+                // Log the bounds
+                // console.log('Viewport bounds:', {
+                //     bottomLeft: bounds[0],
+                //     bottomRight: bounds[1],
+                //     topLeft: bounds[2],
+                //     topRight: bounds[3]
+                // });
+
+                // Original render code
+                gl.useProgram(this.program);
+                gl.uniformMatrix4fv(
+                    gl.getUniformLocation(this.program, 'u_matrix'),
+                    false,
+                    matrix
+                );
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                gl.enableVertexAttribArray(this.aPos);
+                gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+            }
+        };
+
+        map.on('load', () => {
+            map.addLayer(customLayer);
+        });
+
+        // Helper function to invert 4x4 matrix
+        function mat4Invert(a, out) {
+            const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+            const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+            const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+            const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+            const b00 = a00 * a11 - a01 * a10;
+            const b01 = a00 * a12 - a02 * a10;
+            const b02 = a00 * a13 - a03 * a10;
+            const b03 = a01 * a12 - a02 * a11;
+            const b04 = a01 * a13 - a03 * a11;
+            const b05 = a02 * a13 - a03 * a12;
+            const b06 = a20 * a31 - a21 * a30;
+            const b07 = a20 * a32 - a22 * a30;
+            const b08 = a20 * a33 - a23 * a30;
+            const b09 = a21 * a32 - a22 * a31;
+            const b10 = a21 * a33 - a23 * a31;
+            const b11 = a22 * a33 - a23 * a32;
+
+            let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+            if (!det) return null;
+            det = 1.0 / det;
+
+            out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+            out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+            out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+            out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+            out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+            out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+            out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+            out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+            out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+            out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+            out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+            out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+            out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+            out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+            out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+            out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+
+            return det;
+        }
+
+        // Helper function to transform vector by matrix
+        function vec4Transform(m, v, out) {
+            const x = v[0], y = v[1], z = v[2], w = v[3];
+            out[0] = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
+            out[1] = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
+            out[2] = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
+            out[3] = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
+        }
+    </script>
+</body>
+
+</html>
