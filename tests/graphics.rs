@@ -2,6 +2,7 @@ use fogcore::load_tracks_map_folder;
 use fogcore::renderer::RenderedTrackMap;
 use fogcore::renderer::TileRendererBasic;
 use fogcore::renderer::TileRendererPremium;
+use fogcore::renderer::TileRendererPremium2;
 use fogcore::renderer::TileRendererTrait;
 use fogcore::renderer::{BBox, Point};
 use fogcore::TileSize;
@@ -168,7 +169,7 @@ fn test_different_size_rendering() {
     verify_image("different_size_rendering_shenzhen_1024", &composed_png);
 
     // GPU rendering with high-DPI
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
         TileSize::TileSize256,
     )));
     let result = rendered_map
@@ -177,7 +178,7 @@ fn test_different_size_rendering() {
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_256_hidpi", &composed_png);
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
         TileSize::TileSize512,
     )));
     let result = rendered_map
@@ -186,7 +187,7 @@ fn test_different_size_rendering() {
     let composed_png = generate_composed_image_with_white_background(&result.data);
     verify_image("different_size_rendering_shenzhen_512_hidpi", &composed_png);
 
-    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new_sync(
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium::new(
         TileSize::TileSize1024,
     )));
     let result = rendered_map
@@ -197,4 +198,32 @@ fn test_different_size_rendering() {
         "different_size_rendering_shenzhen_1024_hidpi",
         &composed_png,
     );
+
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
+        TileSize::TileSize256,
+    )));
+    let result = rendered_map
+        .try_render_region_containing_bbox(bbox, 9)
+        .unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_256_wgpu", &composed_png);
+
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
+        TileSize::TileSize512,
+    )));
+    let result = rendered_map
+        .try_render_region_containing_bbox(bbox, 9)
+        .unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_512_wgpu", &composed_png);
+
+    rendered_map.set_rendering_backend(Box::new(TileRendererPremium2::new(
+        TileSize::TileSize1024,
+    )));
+    let result = rendered_map
+        .try_render_region_containing_bbox(bbox, 9)
+        .unwrap();
+    let composed_png = generate_composed_image_with_white_background(&result.data);
+    verify_image("different_size_rendering_shenzhen_1024_wgpu", &composed_png);
+
 }

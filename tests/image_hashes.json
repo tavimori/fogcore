@@ -1,11 +1,14 @@
 {
-  "different_size_rendering_shenzhen_1024_hidpi": "ffb99d4225eaac4bfb432ab69c2fcc336651bb1e15ea8f060d3519372bc21dad",
-  "different_size_rendering_shenzhen_256": "cfca9f8759cb9d8c3d4cb5bcff11f7aeb02524ebd1d6c3e0d61b496672a70a64",
-  "different_size_rendering_shenzhen_1024": "ab9c80842b15702e1b1c8887bdc53306442306294ccee0aa17269d1ac24ded74",
-  "athens": "93e62cb4a744cafe7d256479ed605c28e9aa1c6f299ad13ad460a0735cb2f5ab",
-  "shenzhen": "a5d523e60aea3850ff51cb9d69576c29ea148ba4f6ef72266a566c7504139768",
-  "different_size_rendering_shenzhen_512": "3128fa83c98bd65363d2dc3e62870845cbfe33b64576db7da8269c7cfe1e9a74",
+  "different_size_rendering_shenzhen_512_hidpi": "8399d644d5935d68b31a7f398143539d248eb4b5e28b259b3794335a8509735c",
+  "different_size_rendering_shenzhen_1024_hidpi": "345cc263110c67613c5e407c4e3ee9b4c7850aa6b6ce8096607e827bf84373a1",
+  "different_size_rendering_shenzhen_256_wgpu": "4a37d775f8afa5271dab43ab731ea2c7063ecc47ec305f741a5801c0168ebdd3",
   "gba": "973934e2402ada530bb6d25e049b1c6398143d48274056be66695dee194b264e",
-  "different_size_rendering_shenzhen_512_hidpi": "a16a3cf26d9a84f6ef20aba63b64853be5f11e61ccd4f59385ba2830ff6699d2",
-  "different_size_rendering_shenzhen_256_hidpi": "2906fdfbe4f75fd2cdffd91bd864722bf59f02d2e5574d0abced53868db2b8ec"
+  "different_size_rendering_shenzhen_512": "3128fa83c98bd65363d2dc3e62870845cbfe33b64576db7da8269c7cfe1e9a74",
+  "shenzhen": "a5d523e60aea3850ff51cb9d69576c29ea148ba4f6ef72266a566c7504139768",
+  "different_size_rendering_shenzhen_256_hidpi": "b7772033c8485a0243266c7bb47f8a793d4fee7a183896aa18a87f4c8b827333",
+  "different_size_rendering_shenzhen_256": "cfca9f8759cb9d8c3d4cb5bcff11f7aeb02524ebd1d6c3e0d61b496672a70a64",
+  "different_size_rendering_shenzhen_512_wgpu": "80b2b477eb7eb355b6c96a39943bc82222b11735b81f7d07dd59049a70063302",
+  "athens": "93e62cb4a744cafe7d256479ed605c28e9aa1c6f299ad13ad460a0735cb2f5ab",
+  "different_size_rendering_shenzhen_1024_wgpu": "d6ec1d3ea5daf087e98ff9e10d54ca91a19bcd4534320f5423b651fdec000b23",
+  "different_size_rendering_shenzhen_1024": "ab9c80842b15702e1b1c8887bdc53306442306294ccee0aa17269d1ac24ded74"
 }
