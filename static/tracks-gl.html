@@ -24,180 +24,157 @@
 
 <body>
     <div id='map'></div>
-    <script>
-        mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw'; // Replace with your token
+    <script type="module">
+        // Import and initialize FogMap first
+        import init, { FogMap } from '../pkg/fogcore.js';
 
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/light-v11',
-            center: [-74.5, 40],
-            zoom: 9,
-            antialias: true,
-            projection: 'mercator'
-        });
-
-        function get_bounding_mercator_pixels() {
-            const pixels = [0.5, 0.5, 0.4, 0.4];
-            
-            return pixels;
+        async function loadZip(filename) {
+            const response = await fetch(`${filename}`);
+            const arrayBuffer = await response.arrayBuffer();
+            return new Uint8Array(arrayBuffer);
         }
 
-        // Custom layer implementation
-        const customLayer = {
-            id: 'custom-layer',
-            type: 'custom',
-            renderingMode: '2d',
+        let fogMap; // Declare fogMap in outer scope
 
-            // method called when the layer is added to the map
-            // https://docs.mapbox.com/mapbox-gl-js/api/#styleimageinterface#onadd
-            onAdd: function (map, gl) {
-                // create GLSL source for vertex shader
-                const vertexSource = `
-                precision mediump float;
-                uniform mat4 u_matrix;
-                attribute vec2 a_pos;
-                void main() {
-                    gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
-                    gl_PointSize = 100.0;
-                }`;
+        async function initializeMap() {
+            await init();
+            fogMap = await FogMap.new();
 
-                // create GLSL source for fragment shader
-                const fragmentSource = `
-                precision mediump float;
-                void main() {
-                    vec2 center = gl_PointCoord - vec2(0.5);
-                    float dist = length(center);
-                    if (dist > 0.5) {
-                        discard;
-                    }
-                    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
-                }`;
-
-                // create a vertex shader
-                const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-                gl.shaderSource(vertexShader, vertexSource);
-                gl.compileShader(vertexShader);
-
-                // Check vertex shader compilation
-                if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-                    console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
-                    return;
-                }
-
-                // create a fragment shader
-                const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-                gl.shaderSource(fragmentShader, fragmentSource);
-                gl.compileShader(fragmentShader);
-
-                // Check fragment shader compilation
-                if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-                    console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
-                    return;
-                }
-
-                // link the two shaders into a WebGL program
-                this.program = gl.createProgram();
-                gl.attachShader(this.program, vertexShader);
-                gl.attachShader(this.program, fragmentShader);
-                gl.linkProgram(this.program);
-
-                this.aPos = gl.getAttribLocation(this.program, 'a_pos');
-
-                // define vertices of the triangle to be rendered in the custom style layer
-                const helsinki = mapboxgl.MercatorCoordinate.fromLngLat({
-                    lng: 25.004,
-                    lat: 60.239
-                });
-                const berlin = mapboxgl.MercatorCoordinate.fromLngLat({
-                    lng: 13.403,
-                    lat: 52.562
-                });
-                const kyiv = mapboxgl.MercatorCoordinate.fromLngLat({
-                    lng: 30.498,
-                    lat: 50.541
-                });
-
-                // create and initialize a WebGLBuffer to store vertex and color data
-                this.buffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-                gl.bufferData(
-                    gl.ARRAY_BUFFER,
-                    new Float32Array([
-                        helsinki.x,
-                        helsinki.y,
-                        berlin.x,
-                        berlin.y,
-                        kyiv.x,
-                        kyiv.y
-                    ]),
-                    gl.STATIC_DRAW
-                );
-            },
-
-            // method fired on each animation frame
-            // https://docs.mapbox.com/mapbox-gl-js/api/#map.event:render
-            render: function (gl, matrix) {
-                // Create inverse matrix
-                const inverse = new Float64Array(16);
-                const det = mat4Invert(matrix, inverse);
-                
-                // Get viewport corners in clip space (-1 to 1)
-                const corners = [
-                    [-1, -1], // bottom left
-                    [1, -1],  // bottom right
-                    [-1, 1],  // top left
-                    [1, 1]    // top right
-                ];
-                
-                // Transform corners to mercator coordinates
-                const mercatorCorners = corners.map(([x, y]) => {
-                    // Homogeneous coordinates (x, y, z, w)
-                    const vec = [x, y, 0, 1];
-                    const result = [0, 0, 0, 0];
-                    
-                    // Apply inverse transform
-                    vec4Transform(inverse, vec, result);
-                    
-                    // Convert from homogeneous coordinates
-                    return new mapboxgl.MercatorCoordinate(
-                        result[0] / result[3],
-                        result[1] / result[3]
-                    );
-                });
-                
-                // Convert to LngLat
-                const bounds = mercatorCorners.map(coord => coord.toLngLat());
-                
-                // Log mercatorCorners
-                // console.log('Mercator corners:', mercatorCorners);
-
-                // Log the bounds
-                // console.log('Viewport bounds:', {
-                //     bottomLeft: bounds[0],
-                //     bottomRight: bounds[1],
-                //     topLeft: bounds[2],
-                //     topRight: bounds[3]
-                // });
-
-                // Original render code
-                gl.useProgram(this.program);
-                gl.uniformMatrix4fv(
-                    gl.getUniformLocation(this.program, 'u_matrix'),
-                    false,
-                    matrix
-                );
-                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-                gl.enableVertexAttribArray(this.aPos);
-                gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
-                gl.enable(gl.BLEND);
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-                gl.drawArrays(gl.POINTS, 0, 3);
+            const filename = 'tiles.zip';
+            try {
+                const data = await loadZip(filename);
+                fogMap.add_fow_zip(data);
+                console.log(`Loaded ${filename}`);
+            } catch (error) {
+                console.error(`Failed to load ${filename}:`, error);
+                throw error;
             }
-        };
 
-        map.on('load', () => {
-            map.addLayer(customLayer);
-        });
+            mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw';
+
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/light-v11',
+                center: [-74.5, 40],
+                zoom: 9,
+                antialias: true,
+                projection: 'mercator'
+            });
+
+            // Custom layer implementation
+            const customLayer = {
+                id: 'custom-layer',
+                type: 'custom',
+                renderingMode: '2d',
+
+                onAdd: function (map, gl) {
+                    // create GLSL source for vertex shader
+                    const vertexSource = `
+                    precision mediump float;
+                    uniform mat4 u_matrix;
+                    attribute vec2 a_pos;
+                    void main() {
+                        gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+                        gl_PointSize = 10.0;
+                    }`;
+
+                    // create GLSL source for fragment shader
+                    const fragmentSource = `
+                    precision mediump float;
+                    void main() {
+                        vec2 center = gl_PointCoord - vec2(0.5);
+                        float dist = length(center);
+                        if (dist > 0.5) {
+                            discard;
+                        }
+                        gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
+                    }`;
+
+                    // create a vertex shader
+                    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+                    gl.shaderSource(vertexShader, vertexSource);
+                    gl.compileShader(vertexShader);
+
+                    // Check vertex shader compilation
+                    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                        console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
+                        return;
+                    }
+
+                    // create a fragment shader
+                    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+                    gl.shaderSource(fragmentShader, fragmentSource);
+                    gl.compileShader(fragmentShader);
+
+                    // Check fragment shader compilation
+                    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+                        console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
+                        return;
+                    }
+
+                    // link the two shaders into a WebGL program
+                    this.program = gl.createProgram();
+                    gl.attachShader(this.program, vertexShader);
+                    gl.attachShader(this.program, fragmentShader);
+                    gl.linkProgram(this.program);
+
+                    this.aPos = gl.getAttribLocation(this.program, 'a_pos');
+
+                    // Just create the buffer once
+                    this.buffer = gl.createBuffer();
+                },
+
+                render: function (gl, matrix) {
+                    // Use fogMap from outer scope instead of this.fogMap
+                    const bounds = map.getBounds();
+                    const sw = bounds.getSouthWest();
+                    const ne = bounds.getNorthEast();
+
+                    // TODO: use the correct zoom level
+                    const pixels = fogMap.get_bounding_mercator_pixels(
+                        sw.lng,
+                        sw.lat,
+                        ne.lng,
+                        ne.lat
+                    );
+
+                    // Rest of render implementation remains the same...
+                    // Get the latest pixels
+                    // const pixels = get_bounding_mercator_pixels();
+                    const numPoints = pixels.length / 2;
+                    console.log(`drawing ${numPoints} points`);
+                    console.log(`first four pixels: ${pixels.slice(0, 8)}`);
+
+                    // Update buffer with new pixel data
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.bufferData(
+                        gl.ARRAY_BUFFER,
+                        new Float32Array(pixels),
+                        gl.DYNAMIC_DRAW  // Changed to DYNAMIC_DRAW since we update frequently
+                    );
+
+                    gl.useProgram(this.program);
+                    gl.uniformMatrix4fv(
+                        gl.getUniformLocation(this.program, 'u_matrix'),
+                        false,
+                        matrix
+                    );
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+                    gl.enableVertexAttribArray(this.aPos);
+                    gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+                    gl.enable(gl.BLEND);
+                    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                    gl.drawArrays(gl.POINTS, 0, numPoints);
+                }
+            };
+
+            map.on('load', () => {
+                map.addLayer(customLayer);
+            });
+        }
+
+        // Start initialization
+        initializeMap().catch(console.error);
 
         // Helper function to invert 4x4 matrix
         function mat4Invert(a, out) {

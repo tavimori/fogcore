@@ -1,4 +1,5 @@
 use crate::fogmaps::FogMap as FogMapNative;
+use crate::renderer::tile_shader2::TileShader2;
 use crate::renderer::TileRendererPremium2;
 use crate::utils::DEFAULT_TILE_SIZE;
 
@@ -45,6 +46,27 @@ impl FogMap {
     #[wasm_bindgen]
     pub fn add_fow_zip(&mut self, data: &[u8]) {
         self.fogmap.add_fow_zip(data).unwrap();
+    }
+
+    // TODO: use the correct zoom level
+    #[wasm_bindgen]
+    pub fn get_bounding_mercator_pixels(
+        &self,
+        sw_x: f64,
+        sw_y: f64,
+        ne_x: f64,
+        ne_y: f64,
+    ) -> Vec<f32> {
+        // self.renderer.get_bounding_tile_track_pixels()
+        // self.fogmap.
+        let buffer_size_power = 10;
+        let pixels =
+            TileShader2::get_pixels_coordinates(0, 0, &self.fogmap, 0, 0, 0, buffer_size_power);
+        // Convert f32 pixels to i32 and return as flat array
+        pixels
+            .iter()
+            .map(|&coord| (coord / (1 << buffer_size_power) as f32))
+            .collect()
     }
 
     #[wasm_bindgen]
