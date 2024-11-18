@@ -52,10 +52,10 @@ impl FogMap {
     #[wasm_bindgen]
     pub fn get_bounding_mercator_pixels(
         &self,
-        sw_x: f64,
-        sw_y: f64,
-        ne_x: f64,
-        ne_y: f64,
+        _sw_x: f64,
+        _sw_y: f64,
+        _ne_x: f64,
+        _ne_y: f64,
     ) -> Vec<f32> {
         // self.renderer.get_bounding_tile_track_pixels()
         // self.fogmap.
