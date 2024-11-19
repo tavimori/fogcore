@@ -16,6 +16,7 @@ native = [
     "actix-web-actors",
     "actix",
     "serde",
+    "actix-files"
 ]
 premium = []
 wasm = ["wasm-bindgen", "js-sys", "console_error_panic_hook"]
@@ -49,6 +50,7 @@ actix-web = { version = "4.9.0", optional = true }
 actix-web-actors = { version = "4.3.1", optional = true }
 actix = { version = "0.13.5", optional = true }
 serde_json = "1.0"
+actix-files = { version = "0.6.6", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3", features = ["console"] }
