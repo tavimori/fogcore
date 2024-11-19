@@ -97,7 +97,7 @@ impl FogMap {
         let x_max = (x_max * zoom_coefficient) as i64;
         let y_max = (y_max * zoom_coefficient) as i64;
 
-        let buffer_size_power = 9;
+        let buffer_size_power = 10;
 
         let mut pixels = Vec::new();
         for x in x_min..(x_max + 1) {
