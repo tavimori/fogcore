@@ -30,6 +30,11 @@ jobs:
       run: cargo fmt --all -- --check
     - name: Rust code analysis
       run: cargo clippy -- -D warnings
+    - name: Install wasm-pack
+      run: cargo install wasm-pack
+    - name: Build and move wasm package
+      run: | 
+        wasm-pack build --target web --features wasm --no-default-features
     - name: Run Rust tests
       run: cargo test -- --nocapture
     - name: Compress test outputs
