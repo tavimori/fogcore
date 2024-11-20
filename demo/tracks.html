@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Tiling Service with Service Worker</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script type="module">
+        import { initializeWorker } from './wms-worker.js';
+
+        // Initialize map first
+        mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10',
+            center: [0, 0],
+            zoom: 2
+        });
+
+        // Wait for map to load
+        map.on('load', async function () {
+            if ('serviceWorker' in navigator) {
+                try {
+                    // Initialize worker and wait for it to be ready
+                    await initializeWorker();
+                    console.log('ServiceWorker registration successful');
+                    
+                    // Only add custom tiles after worker is ready
+                    map.addSource('custom-tiles', {
+                        'type': 'raster',
+                        'tiles': [
+                            '/custom-tile/{z}/{x}/{y}'
+                        ],
+                        'tileSize': 256
+                    });
+
+                    map.addLayer({
+                        'id': 'custom-tile-layer',
+                        'type': 'raster',
+                        'source': 'custom-tiles',
+                        'paint': {
+                            'raster-opacity': 1,
+                            'raster-fade-duration': 0,
+                        }
+                    });
+                } catch (error) {
+                    console.log('ServiceWorker registration failed:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

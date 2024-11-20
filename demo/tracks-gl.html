@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8' />
+    <title>Custom GL Layer</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id='map'></div>
+    <script type="module">
+        import init, { FogMap } from '../pkg/fogcore.js';
+        import { TrackLayer } from './tracks-layer.js';
+
+        async function loadZip(filename) {
+            const response = await fetch(`${filename}`);
+            const arrayBuffer = await response.arrayBuffer();
+            return new Uint8Array(arrayBuffer);
+        }
+
+        let fogMap; // Declare fogMap in outer scope
+
+        async function initializeMap() {
+            await init();
+            fogMap = await FogMap.new_no_renderer();
+
+            const filename = 'tiles.zip';
+            try {
+                const data = await loadZip(filename);
+                fogMap.add_fow_zip(data);
+                console.log(`Loaded ${filename}`);
+            } catch (error) {
+                console.error(`Failed to load ${filename}:`, error);
+                throw error;
+            }
+
+            mapboxgl.accessToken = 'pk.eyJ1IjoidGF2aW1vcmkiLCJhIjoiY20wdGVxbjU2MDJmcjJpc2c2bmFhNGxsYiJ9.IwN3EwUWqepX8l7sJANEpw';
+
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/light-v11',
+                center: [0, 0],
+                zoom: 2,
+                antialias: true,
+                projection: 'mercator'
+            });
+
+            const trackLayer = new TrackLayer(map, fogMap);
+            
+            map.on('load', () => {
+                map.addLayer(trackLayer);
+            });
+        }
+
+        // Start initialization
+        initializeMap().catch(console.error);
+    </script>
+</body>
+
+</html>

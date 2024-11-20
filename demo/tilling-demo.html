@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Fogcore Demo</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        #map { width: 600px; height: 400px; }
+        .mapImage { image-rendering: pixelated; width: 512px; height: 512px; }
+        .boxdraw {
+            background: rgba(56, 135, 190, 0.1);
+            border: 2px solid #3887be;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #info {
+            display: flex;
+            gap: 10px;
+        }
+        #info p {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Fogcore Demo</h1>
+    <div class="controls">
+        <button id="rerender">Rerender</button>
+        <button id="zoom-in-out">Zoom In/Out</button>
+    <div id="info">
+        <p>X: <span id="x"></span></p>
+        <p>Y: <span id="y"></span></p>
+        <p>Zoom: <span id="zoom"></span></p>
+    </div>
+    </div>
+    <div class="container">
+        <canvas id="mapImage" class="mapImage" width="512" height="512"></canvas>
+        <canvas id="gpuMapImage" class="mapImage" width="512" height="512"></canvas>
+        <div id="map"></div>
+    </div>
+
+    <script type="module">
+        import init, { FogMap, FogRenderer, GpuFogRenderer, lng_to_tile_x, lat_to_tile_y } from "../pkg/fogcore.js";
+        
+        mapboxgl.accessToken = 'SOME_MAPBOX_TOKEN'; // Replace with your actual token
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [114.1, 22.7],
+            zoom: 9
+        });
+
+        map.boxZoom.disable();
+
+        let start, current, box;
+        
+        async function loadFile(filename) {
+            const response = await fetch(`tiles/${filename}`);
+            const arrayBuffer = await response.arrayBuffer();
+            return new Uint8Array(arrayBuffer);
+        }
+
+        async function initializeFogMap() {
+            await init();
+            let fogMap = new FogMap();
+            
+            const files = [
+                '2573lljsijod',    
+                '33c1lljorhmz',
+                '3fc9lorjsrwm',
+                '5158lljorlmi',
+                'cab3lotijkdk',
+            ];
+
+            for (const file of files) {
+                try {
+                    const data = await loadFile(file);
+                    fogMap.add_fow_file(file, data);
+                    console.log(`Loaded ${file}`);
+                } catch (error) {
+                    console.error(`Failed to load ${file}:`, error);
+                }
+            }
+
+            return fogMap;
+        }
+
+        function renderFogMap(fogmap, x, y, zoom) {
+            let cpuPngData = fogRenderer.render_image(fogmap, x, y, zoom);
+            gpuFogRenderer.render_image(fogmap, x, y, zoom, 
+                (img) => {
+                    console.log(`img: ${img}`);
+                    renderImage(img, 'gpuMapImage');
+                }
+            );
+
+            renderImage(cpuPngData, 'mapImage');
+
+            // let gpuPngData = fogRenderer.render_and_blur_image(fogmap, x, y, zoom);
+            // renderImage(gpuPngData, 'gpuMapImage');
+        }
+
+        function renderImage(pngData, canvasId) {
+            const blob = new Blob([pngData], { type: 'image/png' });
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            
+            img.onload = function() {
+                const canvas = document.getElementById(canvasId);
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+            };
+            
+            img.src = url;
+        }
+
+        let fogMap, fogRenderer, gpuFogRenderer;
+        let currentLng, currentLat, currentZoom;
+
+        map.on('load', async () => {
+            fogMap = await initializeFogMap();
+            fogRenderer = new FogRenderer();
+            gpuFogRenderer = await GpuFogRenderer.create(1024, 1024);
+            console.log('gpu renderer created');
+            const canvas = map.getCanvasContainer();
+
+            function onMouseDown(e) {
+                if (!(e.shiftKey && e.button === 0)) return;
+                map.dragPan.disable();
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('keydown', onKeyDown);
+                start = mousePos(e);
+            }
+
+            function onMouseMove(e) {
+                current = mousePos(e);
+                if (!box) {
+                    box = document.createElement('div');
+                    box.classList.add('boxdraw');
+                    canvas.appendChild(box);
+                }
+                const minX = Math.min(start.x, current.x);
+                const maxX = Math.max(start.x, current.x);
+                const minY = Math.min(start.y, current.y);
+                const maxY = Math.max(start.y, current.y);
+                const pos = `translate(${minX}px, ${minY}px)`;
+                box.style.transform = pos;
+                box.style.width = maxX - minX + 'px';
+                box.style.height = maxY - minY + 'px';
+            }
+
+            function onMouseUp(e) {
+                finish([start, mousePos(e)]);
+            }
+
+            function onKeyDown(e) {
+                if (e.keyCode === 27) finish();
+            }
+
+            function mousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                return new mapboxgl.Point(
+                    e.clientX - rect.left - canvas.clientLeft,
+                    e.clientY - rect.top - canvas.clientTop
+                );
+            }
+
+            function finish(bbox) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('keydown', onKeyDown);
+                document.removeEventListener('mouseup', onMouseUp);
+                if (box) {
+                    box.parentNode.removeChild(box);
+                    box = null;
+                }
+                if (bbox) {
+                    const bounds = new mapboxgl.LngLatBounds(
+                        map.unproject(bbox[0]),
+                        map.unproject(bbox[1])
+                    );
+                    const center = bounds.getCenter();
+                    const zoom = Math.floor(map.getZoom());
+                    const x = lng_to_tile_x(center.lng, zoom);
+                    const y = lat_to_tile_y(center.lat, zoom);
+                    
+                    document.getElementById('x').textContent = x;
+                    document.getElementById('y').textContent = y;
+                    document.getElementById('zoom').textContent = zoom;
+
+                    renderFogMap(fogMap, x, y, zoom);
+                }
+                map.dragPan.enable();
+            }
+
+            function updateInfo() {
+                const center = map.getCenter();
+                currentLng = center.lng;
+                currentLat = center.lat;
+                currentZoom = Math.floor(map.getZoom());
+                const currentX = lng_to_tile_x(currentLng, currentZoom);
+                const currentY = lat_to_tile_y(currentLat, currentZoom);
+                
+                document.getElementById('x').textContent = currentX;
+                document.getElementById('y').textContent = currentY;
+                document.getElementById('zoom').textContent = currentZoom;
+
+                return { x: currentX, y: currentY, zoom: currentZoom };
+            }
+
+            function rerenderImage() {
+                const { x, y, zoom } = updateInfo();
+                renderFogMap(fogMap, x, y, zoom);
+            }
+
+            async function zoomInOut() {
+                const originalZoom = currentZoom;
+                const zoomLevels = [
+                    ...Array(5).fill(1),  // Zoom in 5 levels
+                    ...Array(10).fill(-1) // Zoom out 10 levels
+                ];
+
+                for (const zoomChange of zoomLevels) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    currentZoom += zoomChange;
+                    const x = lng_to_tile_x(currentLng, currentZoom);
+                    const y = lat_to_tile_y(currentLat, currentZoom);
+                    renderFogMap(fogmap, x, y, currentZoom);
+                }
+
+                currentZoom = originalZoom;
+                rerenderImage();
+            }
+
+            document.getElementById('rerender').addEventListener('click', rerenderImage);
+            document.getElementById('zoom-in-out').addEventListener('click', zoomInOut);
+
+            map.on('moveend', rerenderImage);
+            rerenderImage();
+
+            canvas.addEventListener('mousedown', onMouseDown, true);
+        });
+    </script>
+</body>
+</html>

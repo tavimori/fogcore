@@ -1,0 +1,18 @@
+{
+  "name": "fogcore",
+  "type": "module",
+  "collaborators": [
+    "Licheng Mao <tavimori@gmail.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "fogcore_bg.wasm",
+    "fogcore.js",
+    "fogcore.d.ts"
+  ],
+  "main": "fogcore.js",
+  "types": "fogcore.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
